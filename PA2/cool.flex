@@ -314,7 +314,7 @@ K_TRUE		t(?i:rue)
  /*
   * Error handling.
   */
-.			{
+<*>.			{
 	/*
 	 * Invalid character error.
 	 */
