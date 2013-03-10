@@ -136,11 +136,21 @@
     
     /* You will want to change the following line. */
     %type <features> dummy_feature_list
-    
+
+%type <feature> feature
+%type <formal> formal
+%type <formals> dummy_formal_list
+%type <expression> expr
+%type <case_> case_st
+%type <cases> case_list
+%type <expression> let_expression
+%type <expressions> dummy_expr_list
+%type <expressions> expr_list
+
     /* Precedence declarations go here. */
     
     
-    %%
+%%
     /* 
     Save the root of the abstract syntax tree in a global variable.
     */
@@ -167,10 +177,116 @@
     /* Feature list may be empty, but no empty features in list. */
     dummy_feature_list:		/* empty */
     {  $$ = nil_Features(); }
+    | dummy_feature_list ';' feature
+    { $$ = append_Features( $1, single_Features( $3));}
+    ;
     
+/*
+ * grammars added by me are not indented.
+ */
+feature: ID '(' dummy_formal_list ')' ':' TYPE '{' expr '}'
+       { $$ = method( $1, $3, $6, $8); }
+       | ID ':' TYPE
+       { $$ = attr( $1, $3, no_expr()); }
+       | ID ':' TYPE ASSIGN expr
+       { $$ = attr( $1, $3, $5); }
+       ;
+
+dummy_formal_list: /* empty */
+		 { $$ = nil_Formals(); }
+		 | dummy_formal_list ',' formal
+	         { append_Formals( $1, single_Formals( $3)); }
+	         ;
+
+formal: ID ':' TYPE
+      { $$ = formal( $1, $3); }
+      ;
+
+expr: ID ASSIGN expr
+    { $$ = assign( $1, $3); }
+    | expr '.' ID '(' dummy_expr_list ')'
+    { $$ = dispatch( $1, $3, $5); }
+    | expr '@' TYPE '.' ID '(' dummy_expr_list ')'
+    { $$ = static_dispatch( $1, $3, $5, $7); }
+    | ID '(' dummy_expr_list ')'
+    { $$ = dispatch( object( idtable.add_string("self")), $1, $3); }
+    | IF expr THEN expr ELSE expr fi
+    { $$ = cond( $2, $4, $6); }
+    | WHILE expr LOOP expr POOL
+    { $$ = loop( $2, $4); }
+    | '{' expr_list '}'
+    { $$ = block( $2); }
+    | let_expression
+    { $$ = $1; }
+    | CASE expr OF case_list ESAC
+    { $$ = typecase( $2, $4); }
+    | NEW TYPE
+    { $$ = new_( $2); }
+    | ISVOID expr
+    { $$ = isvoid( $2); }
+    | expr '+' expr
+    { $$ = plus( $1, $3); }
+    | expr '-' expr
+    { $$ = sub( $1, $3); }
+    | expr '*' expr
+    { $$ = mul( $1, $3); }
+    | expr '/' expr
+    { $$ = divide( $1, $3); }
+    | '~' expr
+    { $$ = neg( $2); }
+    | expr '<' expr
+    { $$ = lt( $1, $3); }
+    | expr LE expr
+    { $$ = leq( $1, $3); }
+    | expr '=' expr
+    { $$ = eq( $1, $3); }
+    | NOT expr
+    { $$ = comp( $2); }
+    | '(' expr ')'
+    { $$ = $2; }
+    | ID
+    { $$ = object( $1); }
+    | INT_CONST
+    { $$ = int_const( $1); }
+    | STR_CONST
+    { $$ = string_const( $1); }
+    | BOOL_CONST
+    { $$ = bool_const( $2); }
+    ;
+
+case_st: ID ':' TYPE DARROW expr';'
+       { $$ = branch( $1, $3, $5); }
+       ;
+case_list : case_st
+	  { $$ = single_Cases( $1); }
+	  : case_list ';' case_st
+	  { $$ = append_Cases( $1, single_Cases( $3)); }
+	  ;
+
+let_expression: ID ':' TYPE ',' let_expression
+	      { $$ = let( $1, $3, no_expr(), $5); }
+	      | ID ':' TYPE ASSIGN expr ',' let_expression
+	      { $$ = let( $1, $3, $5, $7); }
+	      | ID ':' TYPE IN expr
+	      { $$ = let( $1, $3, no_expr(), $5); }
+	      | ID ':' TYPE ASSIGN expr IN expr
+	      { $$ = let( $1, $3, $5, $7); }
+	      ;
+
+dummy_expr_list: /* empty */
+	       { $$ = nil_Expressions(); }
+	       | expr_list
+	       { $$ = $1; }
+	       ;
+
+expr_list: expr
+	 { $$ = single_Expressions( $1); }
+	 | expr_list ',' expr
+	 { $$ = append_Expressions( $1, single_Expressions( $3)); }
+	 ;
     
     /* end of grammar */
-    %%
+%%
     
     /* This function is called automatically when Bison detects a parse error. */
     void yyerror(char *s)
@@ -186,4 +302,4 @@
       if(omerrs>50) {fprintf(stdout, "More than 50 errors\n"); exit(1);}
     }
     
-    
+
