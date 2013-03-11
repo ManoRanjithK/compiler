@@ -151,15 +151,16 @@
 
     /* Precedence declarations go here. */
 
-%left '.'
-%left '@'
-%left '~'
-%left ISVOID
-%left '*' '/'
-%left '+' '-'
-%left LE '<' '='
-%left NOT
+%left IN
 %left ASSIGN
+%left NOT
+%left LE '<' '='
+%left '+' '-'
+%left '*' '/'
+%left ISVOID
+%left '~'
+%left '@'
+%left '.'
     
 %%
     /* 
@@ -201,13 +202,13 @@ feature_list: feature
 	    { $$ = append_Features( $1, single_Features( $3));}
 	    ;
 
-feature: ID '(' dummy_formal_list ')' ':' TYPE '{' expr '}'
+feature: OBJECTID '(' dummy_formal_list ')' ':' TYPEID '{' expr '}'
        {
          $$ = method( $1, $3, $6, $8); }
-       | ID ':' TYPE
+       | OBJECTID ':' TYPEID
        { 
          $$ = attr( $1, $3, no_expr()); }
-       | ID ':' TYPE ASSIGN expr
+       | OBJECTID ':' TYPEID ASSIGN expr
        { 
          $$ = attr( $1, $3, $5); }
        ;
@@ -225,24 +226,24 @@ formal_list: formal
 	   { append_Formals( $1, single_Formals( $3)); }
 	   ;
 
-formal: ID ':' TYPE
+formal: OBJECTID ':' TYPEID
       { 
         $$ = formal( $1, $3); }
       ;
 
-expr: ID ASSIGN expr
+expr: OBJECTID ASSIGN expr
     { 
       $$ = assign( $1, $3); }
-    | expr '.' ID '(' dummy_expr_list ')'
+    | expr '.' OBJECTID '(' dummy_expr_list ')'
     { 
       $$ = dispatch( $1, $3, $5); }
-    | expr '@' TYPE '.' ID '(' dummy_expr_list ')'
+    | expr '@' TYPEID '.' OBJECTID '(' dummy_expr_list ')'
     { 
       $$ = static_dispatch( $1, $3, $5, $7); }
-    | ID '(' dummy_expr_list ')'
+    | OBJECTID '(' dummy_expr_list ')'
     { 
       $$ = dispatch( object( idtable.add_string("self")), $1, $3); }
-    | IF expr THEN expr ELSE expr fi
+    | IF expr THEN expr ELSE expr FI
     { 
       $$ = cond( $2, $4, $6); }
     | WHILE expr LOOP expr POOL
@@ -251,13 +252,13 @@ expr: ID ASSIGN expr
     | '{' expr_list '}'
     { 
       $$ = block( $2); }
-    | let_expression
+    | LET let_expression
     { 
-      $$ = $1; }
+      $$ = $2; }
     | CASE expr OF case_list ESAC
     { 
-      $$ = typecase( $2, $4); }
-    | NEW TYPE
+      $$ = typcase( $2, $4); }
+    | NEW TYPEID
     { 
       $$ = new_( $2); }
     | ISVOID expr
@@ -293,7 +294,7 @@ expr: ID ASSIGN expr
     | '(' expr ')'
     { 
       $$ = $2; }
-    | ID
+    | OBJECTID
     { 
       $$ = object( $1); }
     | INT_CONST
@@ -304,31 +305,31 @@ expr: ID ASSIGN expr
       $$ = string_const( $1); }
     | BOOL_CONST
     { 
-      $$ = bool_const( $2); }
+      $$ = bool_const( $1); }
     ;
 
-case_st: ID ':' TYPE DARROW expr';'
+case_st: OBJECTID ':' TYPEID DARROW expr';'
        { 
          $$ = branch( $1, $3, $5); }
        ;
 case_list : case_st
 	  { 
 	    $$ = single_Cases( $1); }
-	  : case_list ';' case_st
+	  | case_list ';' case_st
 	  { 
 	    $$ = append_Cases( $1, single_Cases( $3)); }
 	  ;
 
-let_expression: ID ':' TYPE ',' let_expression
+let_expression: OBJECTID ':' TYPEID ',' let_expression
 	      { 
 	        $$ = let( $1, $3, no_expr(), $5); }
-	      | ID ':' TYPE ASSIGN expr ',' let_expression
+	      | OBJECTID ':' TYPEID ASSIGN expr ',' let_expression
 	      { 
 	        $$ = let( $1, $3, $5, $7); }
-	      | ID ':' TYPE IN expr
+	      | OBJECTID ':' TYPEID IN expr
 	      { 
 	        $$ = let( $1, $3, no_expr(), $5); }
-	      | ID ':' TYPE ASSIGN expr IN expr
+	      | OBJECTID ':' TYPEID ASSIGN expr IN expr
 	      { 
 	        $$ = let( $1, $3, $5, $7); }
 	      ;
