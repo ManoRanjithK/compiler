@@ -185,104 +185,145 @@
  * grammars added by me are not indented.
  */
 feature: ID '(' dummy_formal_list ')' ':' TYPE '{' expr '}'
-       { $$ = method( $1, $3, $6, $8); }
+       {
+         $$ = method( $1, $3, $6, $8); }
        | ID ':' TYPE
-       { $$ = attr( $1, $3, no_expr()); }
+       { 
+         $$ = attr( $1, $3, no_expr()); }
        | ID ':' TYPE ASSIGN expr
-       { $$ = attr( $1, $3, $5); }
+       { 
+         $$ = attr( $1, $3, $5); }
        ;
 
 dummy_formal_list: /* empty */
-		 { $$ = nil_Formals(); }
+		 { 
+		   $$ = nil_Formals(); }
 		 | dummy_formal_list ',' formal
 	         { append_Formals( $1, single_Formals( $3)); }
 	         ;
 
 formal: ID ':' TYPE
-      { $$ = formal( $1, $3); }
+      { 
+        $$ = formal( $1, $3); }
       ;
 
 expr: ID ASSIGN expr
-    { $$ = assign( $1, $3); }
+    { 
+      $$ = assign( $1, $3); }
     | expr '.' ID '(' dummy_expr_list ')'
-    { $$ = dispatch( $1, $3, $5); }
+    { 
+      $$ = dispatch( $1, $3, $5); }
     | expr '@' TYPE '.' ID '(' dummy_expr_list ')'
-    { $$ = static_dispatch( $1, $3, $5, $7); }
+    { 
+      $$ = static_dispatch( $1, $3, $5, $7); }
     | ID '(' dummy_expr_list ')'
-    { $$ = dispatch( object( idtable.add_string("self")), $1, $3); }
+    { 
+      $$ = dispatch( object( idtable.add_string("self")), $1, $3); }
     | IF expr THEN expr ELSE expr fi
-    { $$ = cond( $2, $4, $6); }
+    { 
+      $$ = cond( $2, $4, $6); }
     | WHILE expr LOOP expr POOL
-    { $$ = loop( $2, $4); }
+    { 
+      $$ = loop( $2, $4); }
     | '{' expr_list '}'
-    { $$ = block( $2); }
+    { 
+      $$ = block( $2); }
     | let_expression
-    { $$ = $1; }
+    { 
+      $$ = $1; }
     | CASE expr OF case_list ESAC
-    { $$ = typecase( $2, $4); }
+    { 
+      $$ = typecase( $2, $4); }
     | NEW TYPE
-    { $$ = new_( $2); }
+    { 
+      $$ = new_( $2); }
     | ISVOID expr
-    { $$ = isvoid( $2); }
+    { 
+      $$ = isvoid( $2); }
     | expr '+' expr
-    { $$ = plus( $1, $3); }
+    { 
+      $$ = plus( $1, $3); }
     | expr '-' expr
-    { $$ = sub( $1, $3); }
+    { 
+      $$ = sub( $1, $3); }
     | expr '*' expr
-    { $$ = mul( $1, $3); }
+    { 
+      $$ = mul( $1, $3); }
     | expr '/' expr
-    { $$ = divide( $1, $3); }
+    { 
+      $$ = divide( $1, $3); }
     | '~' expr
-    { $$ = neg( $2); }
+    { 
+      $$ = neg( $2); }
     | expr '<' expr
-    { $$ = lt( $1, $3); }
+    { 
+      $$ = lt( $1, $3); }
     | expr LE expr
-    { $$ = leq( $1, $3); }
+    { 
+      $$ = leq( $1, $3); }
     | expr '=' expr
-    { $$ = eq( $1, $3); }
+    { 
+      $$ = eq( $1, $3); }
     | NOT expr
-    { $$ = comp( $2); }
+    { 
+      $$ = comp( $2); }
     | '(' expr ')'
-    { $$ = $2; }
+    { 
+      $$ = $2; }
     | ID
-    { $$ = object( $1); }
+    { 
+      $$ = object( $1); }
     | INT_CONST
-    { $$ = int_const( $1); }
+    { 
+      $$ = int_const( $1); }
     | STR_CONST
-    { $$ = string_const( $1); }
+    { 
+      $$ = string_const( $1); }
     | BOOL_CONST
-    { $$ = bool_const( $2); }
+    { 
+      $$ = bool_const( $2); }
     ;
 
 case_st: ID ':' TYPE DARROW expr';'
-       { $$ = branch( $1, $3, $5); }
+       { 
+         $$ = branch( $1, $3, $5); }
        ;
 case_list : case_st
-	  { $$ = single_Cases( $1); }
+	  { 
+	    $$ = single_Cases( $1); }
 	  : case_list ';' case_st
-	  { $$ = append_Cases( $1, single_Cases( $3)); }
+	  { 
+	    $$ = append_Cases( $1, single_Cases( $3)); }
 	  ;
 
 let_expression: ID ':' TYPE ',' let_expression
-	      { $$ = let( $1, $3, no_expr(), $5); }
+	      { 
+	        $$ = let( $1, $3, no_expr(), $5); }
 	      | ID ':' TYPE ASSIGN expr ',' let_expression
-	      { $$ = let( $1, $3, $5, $7); }
+	      { 
+	        $$ = let( $1, $3, $5, $7); }
 	      | ID ':' TYPE IN expr
-	      { $$ = let( $1, $3, no_expr(), $5); }
+	      { 
+	        $$ = let( $1, $3, no_expr(), $5); }
 	      | ID ':' TYPE ASSIGN expr IN expr
-	      { $$ = let( $1, $3, $5, $7); }
+	      { 
+	        $$ = let( $1, $3, $5, $7); }
 	      ;
 
 dummy_expr_list: /* empty */
-	       { $$ = nil_Expressions(); }
+	       { 
+	         $$ = nil_Expressions(); }
 	       | expr_list
-	       { $$ = $1; }
+	       { 
+	         $$ = $1; }
 	       ;
 
 expr_list: expr
-	 { $$ = single_Expressions( $1); }
+	 { 
+	   $$ = single_Expressions( $1); }
 	 | expr_list ',' expr
-	 { $$ = append_Expressions( $1, single_Expressions( $3)); }
+	 { 
+	   $$ = append_Expressions( $1, single_Expressions( $3)); }
 	 ;
     
     /* end of grammar */
