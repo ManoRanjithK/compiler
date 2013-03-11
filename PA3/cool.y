@@ -173,9 +173,14 @@
     : class			/* single class */
     { $$ = single_Classes($1);
     parse_results = $$; }
+    : error class
+    { $$ = single_Classes($2);
+    parse_results = $$; }
     | class_list class	/* several classes */
     { $$ = append_Classes($1,single_Classes($2)); 
     parse_results = $$; }
+    | class_list error class
+    { $$ = append_Classes($1,single_Classes($3)); }
     ;
     
     /* If no parent is specified, the class inherits from the Object class. */
@@ -196,19 +201,21 @@
 /*
  * grammars added by me are not indented.
  */
-feature_list: feature ';'
+feature_list: feature
 	    { $$ = single_Features( $1); }
-	    | feature_list ';' feature
+	    | feature_list feature 
 	    { $$ = append_Features( $1, single_Features( $3));}
+	    | feature_list error ';' feature 
+	    { $$ = append_Features( $1, single_Features( $4));}
 	    ;
 
-feature: OBJECTID '(' dummy_formal_list ')' ':' TYPEID '{' expr '}'
+feature: OBJECTID '(' dummy_formal_list ')' ':' TYPEID '{' expr '}' ';'
        {
          $$ = method( $1, $3, $6, $8); }
-       | OBJECTID ':' TYPEID
+       | OBJECTID ':' TYPEID ';'
        { 
          $$ = attr( $1, $3, no_expr()); }
-       | OBJECTID ':' TYPEID ASSIGN expr
+       | OBJECTID ':' TYPEID ASSIGN expr ';'
        { 
          $$ = attr( $1, $3, $5); }
        ;
@@ -332,6 +339,12 @@ let_expression: OBJECTID ':' TYPEID ',' let_expression
 	      | OBJECTID ':' TYPEID ASSIGN expr IN expr
 	      { 
 	        $$ = let( $1, $3, $5, $7); }
+	      | error ',' let_expression
+	      { 
+	        $$ = $3; }
+	      | error IN expr
+	      { 
+	        $$ = $3; }
 	      ;
 
 dummy_expr_list: /* empty */
