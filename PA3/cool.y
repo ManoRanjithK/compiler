@@ -148,6 +148,7 @@
 %type <expression> let_expression
 %type <expressions> dummy_expr_list
 %type <expressions> expr_list
+%type <expressions> expr_list_semi
 
     /* Precedence declarations go here. */
 
@@ -367,12 +368,12 @@ expr_list: expr
 	   $$ = append_Expressions( $1, single_Expressions( $3)); }
 	 ;
 
-expr_list_semi: expr
+expr_list_semi: expr ';'
 	      { 
 	        $$ = single_Expressions( $1); }
-	      | expr_list_semi ';' expr
+	      | expr_list_semi expr ';'
 	      { 
-	        $$ = append_Expressions( $1, single_Expressions( $3)); }
+	        $$ = append_Expressions( $1, single_Expressions( $2)); }
 	      ;
     
     /* end of grammar */
