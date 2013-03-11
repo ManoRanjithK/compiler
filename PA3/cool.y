@@ -155,7 +155,7 @@
 %left IN
 %right ASSIGN
 %left NOT
-%token LE '<' '='
+%nonassoc LE '<' '='
 %left '+' '-'
 %left '*' '/'
 %left ISVOID
@@ -204,11 +204,17 @@
  * grammars added by me are not indented.
  */
 feature_list: feature
-	    { $$ = single_Features( $1); }
+	    {
+	      $$ = single_Features( $1); }
 	    | feature_list feature 
-	    { $$ = append_Features( $1, single_Features( $2));}
-	    | feature_list error ';' feature 
-	    { $$ = append_Features( $1, single_Features( $4));}
+	    {
+	      $$ = append_Features( $1, single_Features( $2));}
+	    | feature_list error ';'
+	    {
+	      $$ = $1;}
+	    | error ';'
+	    {
+	      $$ = nil_Features();;}
 	    ;
 
 feature: OBJECTID '(' dummy_formal_list ')' ':' TYPEID '{' expr '}' ';'
@@ -226,13 +232,16 @@ dummy_formal_list: /* empty */
 		 { 
 		   $$ = nil_Formals(); }
 	         | formal_list
-		 { $$ = $1; }
+		 {
+		   $$ = $1; }
 	         ;
 
 formal_list: formal
-	   { $$ = single_Formals( $1); }
+	   {
+	     $$ = single_Formals( $1); }
 	   | formal_list ',' formal
-	   { append_Formals( $1, single_Formals( $3)); }
+	   {
+	     $$ = append_Formals( $1, single_Formals( $3)); }
 	   ;
 
 formal: OBJECTID ':' TYPEID
@@ -261,9 +270,6 @@ expr: OBJECTID ASSIGN expr
     | '{' expr_list_semi '}'
     { 
       $$ = block( $2); }
-    | '{' error '}'
-    { 
-      $$ = block( nil_Expressions()); }
     | LET let_expression
     { 
       $$ = $2; }
@@ -320,16 +326,16 @@ expr: OBJECTID ASSIGN expr
       $$ = bool_const( $1); }
     ;
 
-case_st: OBJECTID ':' TYPEID DARROW expr';'
+case_st: OBJECTID ':' TYPEID DARROW expr ';'
        { 
          $$ = branch( $1, $3, $5); }
        ;
 case_list : case_st
 	  { 
 	    $$ = single_Cases( $1); }
-	  | case_list ';' case_st
+	  | case_list case_st
 	  { 
-	    $$ = append_Cases( $1, single_Cases( $3)); }
+	    $$ = append_Cases( $1, single_Cases( $2)); }
 	  ;
 
 let_expression: OBJECTID ':' TYPEID ',' let_expression
@@ -374,8 +380,14 @@ expr_list_semi: expr ';'
 	      | expr_list_semi expr ';'
 	      { 
 	        $$ = append_Expressions( $1, single_Expressions( $2)); }
+	      | error ';'
+	      {
+	        $$ = nil_Expressions(); }
+              | expr_list_semi error ';'
+	      {
+	        $$ = $1; }
 	      ;
-    
+
     /* end of grammar */
 %%
     
