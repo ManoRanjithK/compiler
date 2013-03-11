@@ -148,6 +148,7 @@
 %type <expressions> expr_list
 
     /* Precedence declarations go here. */
+
 %left '.'
 %left '@'
 %left '~'
