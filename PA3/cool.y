@@ -153,9 +153,9 @@
     /* Precedence declarations go here. */
 
 %left IN
-%left ASSIGN
+%right ASSIGN
 %left NOT
-%left LE '<' '='
+%token LE '<' '='
 %left '+' '-'
 %left '*' '/'
 %left ISVOID
