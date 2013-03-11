@@ -148,7 +148,15 @@
 %type <expressions> expr_list
 
     /* Precedence declarations go here. */
-    
+%left '.'
+%left '@'
+%left '~'
+%left ISVOID
+%left '*' '/'
+%left '+' '-'
+%left LE '<' '='
+%left NOT
+%left ASSIGN
     
 %%
     /* 
