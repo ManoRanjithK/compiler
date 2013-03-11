@@ -173,7 +173,7 @@
     : class			/* single class */
     { $$ = single_Classes($1);
     parse_results = $$; }
-    : error class
+    | error class
     { $$ = single_Classes($2);
     parse_results = $$; }
     | class_list class	/* several classes */
@@ -204,7 +204,7 @@
 feature_list: feature
 	    { $$ = single_Features( $1); }
 	    | feature_list feature 
-	    { $$ = append_Features( $1, single_Features( $3));}
+	    { $$ = append_Features( $1, single_Features( $2));}
 	    | feature_list error ';' feature 
 	    { $$ = append_Features( $1, single_Features( $4));}
 	    ;
