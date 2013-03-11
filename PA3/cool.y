@@ -173,14 +173,15 @@
     : class			/* single class */
     { $$ = single_Classes($1);
     parse_results = $$; }
-    | error class
-    { $$ = single_Classes($2);
+    | error ';' class
+    { $$ = single_Classes($3);
     parse_results = $$; }
     | class_list class	/* several classes */
     { $$ = append_Classes($1,single_Classes($2)); 
     parse_results = $$; }
-    | class_list error class
-    { $$ = append_Classes($1,single_Classes($3)); }
+    | class_list error ';'
+    { $$ = $1;
+    parse_results = $$; }
     ;
     
     /* If no parent is specified, the class inherits from the Object class. */
