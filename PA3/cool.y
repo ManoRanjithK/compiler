@@ -257,7 +257,7 @@ expr: OBJECTID ASSIGN expr
     | WHILE expr LOOP expr POOL
     { 
       $$ = loop( $2, $4); }
-    | '{' expr_list '}'
+    | '{' expr_list_semi '}'
     { 
       $$ = block( $2); }
     | '{' error '}'
@@ -366,6 +366,14 @@ expr_list: expr
 	 { 
 	   $$ = append_Expressions( $1, single_Expressions( $3)); }
 	 ;
+
+expr_list_semi: expr
+	      { 
+	        $$ = single_Expressions( $1); }
+	      | expr_list_semi ';' expr
+	      { 
+	        $$ = append_Expressions( $1, single_Expressions( $3)); }
+	      ;
     
     /* end of grammar */
 %%
