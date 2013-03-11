@@ -259,6 +259,9 @@ expr: OBJECTID ASSIGN expr
     | '{' expr_list '}'
     { 
       $$ = block( $2); }
+    | '{' error '}'
+    { 
+      $$ = block( nil_Expressions()); }
     | LET let_expression
     { 
       $$ = $2; }
