@@ -137,9 +137,11 @@
     /* You will want to change the following line. */
     %type <features> dummy_feature_list
 
+%type <features> feature_list
 %type <feature> feature
 %type <formal> formal
 %type <formals> dummy_formal_list
+%type <formals> formal_list
 %type <expression> expr
 %type <case_> case_st
 %type <cases> case_list
@@ -185,14 +187,20 @@
     
     /* Feature list may be empty, but no empty features in list. */
     dummy_feature_list:		/* empty */
-    {  $$ = nil_Features(); }
-    | dummy_feature_list ';' feature
-    { $$ = append_Features( $1, single_Features( $3));}
+    { $$ = nil_Features(); }
+    | feature_list
+    { $$ = $1; }
     ;
     
 /*
  * grammars added by me are not indented.
  */
+feature_list: feature
+	    { $$ = single_Features( $1); }
+	    | feature_list ';' feature
+	    { $$ = append_Features( $1, single_Features( $3));}
+	    ;
+
 feature: ID '(' dummy_formal_list ')' ':' TYPE '{' expr '}'
        {
          $$ = method( $1, $3, $6, $8); }
@@ -207,9 +215,15 @@ feature: ID '(' dummy_formal_list ')' ':' TYPE '{' expr '}'
 dummy_formal_list: /* empty */
 		 { 
 		   $$ = nil_Formals(); }
-		 | dummy_formal_list ',' formal
-	         { append_Formals( $1, single_Formals( $3)); }
+	         | formal_list
+		 { $$ = $1; }
 	         ;
+
+formal_list: formal
+	   { $$ = single_Formals( $1); }
+	   | formal_list ',' formal
+	   { append_Formals( $1, single_Formals( $3)); }
+	   ;
 
 formal: ID ':' TYPE
       { 
