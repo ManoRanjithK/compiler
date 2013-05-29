@@ -390,4 +390,135 @@ void program_class::semant()
     }
 }
 
+void class__class::collect_Methods()
+{
+	for ( int i = features->first(); features->more( i); i = features->next( i))
+	{
+		features->nth( i)->collect_Feature_Types();
+	}
+}
+
+bool class__class::check_Class_Types()
+{
+	for ( int i = features->first(); features->more( i); i = features->next( i))
+	{
+		Feature ft = features->nth( i);
+		ft->install_Feature_Types();
+	}
+
+	for ( int i = features->first(); features->more( i); i = features->next( i))
+	{
+		Feature ft = features->nth( i);
+		if ( !ft->check_Feature_Types())
+		{
+			return false;
+		}
+	}
+
+	return true;
+}
+
+void method_class::collect_Feature_Types()
+{
+	feature_type = class_table->lookup( return_type);
+	List<class_tree_node_type> *syms = new List<class_tree_node_type>( feature_type, NULL);
+	for ( int i = formals.first(); formals->more( i); i = formals->next( i))
+	{
+		Type type = formals->nth( i)->collect_Formal_Type();
+		syms = new List<class_tree_node_type>( type, syms);
+	}
+
+	method_table->addid( name, syms);
+}
+
+void method_class::install_Feature_Types()
+{
+}
+
+bool method_class::check_Feature_Types()
+{
+	var_table->enter_scope();
+	for ( int i = formals.first(); formals->more( i); i = formals->next( i))
+	{
+		Formal fm = formals->nth( i);
+		if ( !fm->check_Formal_Type())
+		{
+			return false;
+		}
+
+		fm->install_Formal_Type();
+	}
+
+	Type type = feature_type;
+	Type body_type = expr->get_Expr_Type();
+
+	var_table->exit_scope();
+
+	return type && type->is_defined() && body_type && body_type->is_subtype_of( type);
+}
+
+void attr_class::collect_Feature_Types()
+{
+}
+
+bool attr_class::check_Feature_Types()
+{
+	Type type = feature_type;
+	Type t2 = init->is_no_expr() ? init->get_Expr_Type() : type;
+
+	return type && type->is_defined() && t2 && t2->is_subtype_of( type);
+}
+
+void attr_class::install_Feature_Types()
+{
+	feature_type = lookup_install_type( type_decl);
+	var_table->addid( name, feature_type);
+}
+
+Type formal_class::collect_Formal_Type()
+{
+	type = val_table->probe( name);
+	if ( type == NULL)
+	{
+		type = lookup_install_type( type_decl);
+	}
+	else
+	{
+		type = No_type;
+	}
+
+	return type;
+}
+
+bool formal_class::check_Formal_Type()
+{
+	return type && type->is_defined();
+}
+
+void formal_class::install_Formal_Type()
+{
+	var_table->addid( name, type);
+}
+
+Type branch_class::check_Case_Type( Type path_type)
+{
+	Type id_type = class_table->lookup( type_decl);
+	Type ret = No_type;
+
+	if ( id_type && id_type->is_defined() &&
+			( id_type->is_subtype_of( path_type)
+			  || path_type->is_subtype_of( id_type)
+			)
+	   )
+	{
+		var_table->enter_scope();
+		var_table->addid( name, id_type);
+
+		ret = expr->get_Expr_Type();
+
+		var_table->exit_scope();
+	}
+
+	return ret;
+}
 
