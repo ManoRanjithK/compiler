@@ -115,8 +115,8 @@ class_tree_node find_lca( class_tree_node x, class_tree_node y)
 
 static class_tree_node union_set( class_tree_node first, class_tree_node second)
 {
-	first = first.find_set_father();
-	second = second.find_set_father();
+	first = first->find_set();
+	second = second->find_set();
 	if ( first == second)
 	{
 		return NULL;
@@ -126,13 +126,13 @@ static class_tree_node union_set( class_tree_node first, class_tree_node second)
 
 	new_root->set_size = first->set_size + second->set_size;
 	new_root->set_rank += first->set_rank == second->set_rank;
-	first->set_father = second->set_father = new_root;
+	first->set_head = second->set_head = new_root;
 
 	return new_root;
 }
 
 ClassTable::ClassTable(Classes classes) : semant_errors(0) , error_stream(cerr) {
-	symtable.enterscope();
+	class_table->enterscope();
 
 	install_basic_classes();
 
@@ -148,31 +148,34 @@ ClassTable::ClassTable(Classes classes) : semant_errors(0) , error_stream(cerr) 
 		else
 		{
 			// Find error: Redefinition of class
-			return 0;
+			semant_error( cur) << "Redefinition of Class " << cur->name;
+			return;
 		}
 
 		class_tree_node father_node = lookup_install_type( cur->parent);
 
-		if ( !ct_node.set_father( father_node))
+		if ( !ct_node->set_father( father_node))
 		{
 			// Find error: cur could not be a subclass of father node.
-			return 0;
+			semant_error( cur) << "Find inherit circle of Class " << cur->name
+				<< " and Class " << cur->parent;
+			return;
 		}
 	}
 
-	class_tree_node root = symtable.probe( Object);
+	class_tree_node root = class_table->probe( Object);
 	if ( !root)
 	{
-		// Find error: No Object Class!
-		return 0;
+		// Find bug: No Object Class!
+		return;
 	}
 
 	root->walk_down();
 
-	symtable.exitscope();
+	class_table->exitscope();
 }
 
-bool class_tree_node_type::walk_down( symtable_type *symtable)
+bool class_tree_node_type::walk_down()
 {
 	var_table->enter_scope();
 	var_table->addid( self, this);
@@ -299,6 +302,7 @@ void ClassTable::install_basic_classes() {
 						      Str,
 						      no_expr()))),
 	       filename);
+    Class_ Self_class = class_( SELF_TYPE, Object, nil_Features(), filename);
 
     ::Object_type = new class_tree_node( Object_class);
 
@@ -314,7 +318,6 @@ void ClassTable::install_basic_classes() {
     ::Str_type = new class_tree_node( Str_class);
     ::Str_type->set_father( Object_type);
 
-    Class_ Self_class = class_( SELF_TYPE, Object, nil_Features(), filename);
     ::Self_type = new class_tree_node( Self_class);
 
     symtable.addid( Object, ::Object_type);

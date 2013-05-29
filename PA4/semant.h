@@ -83,11 +83,13 @@ struct class_tree_node_type {
 
 	method_table_type method_table;
 
+	protected:
 	class_tree_node find_set()
 	{
 		return set_head == this ? this : set_head = set_head->find_set();
 	}
 
+	public:
 	friend class_tree_node union_set( class_tree_node, class_tree_node);
 
 	class_tree_node_type( Type class_) :
