@@ -811,8 +811,7 @@ public:
 
    Type do_Check_Expr_Type()
    {
-	   return this->type =
-		   e1->get_Expr_Type() == Int_type && e2->get_Expr_Type() == Int_type
+	   return e1->get_Expr_Type() == Int_type && e2->get_Expr_Type() == Int_type
 		   ? Int_type : No_type;
    }
 
@@ -840,8 +839,7 @@ public:
 
    Type do_Check_Expr_Type()
    {
-	   return this->type =
-		   e1->get_Expr_Type() == Int_type && e2->get_Expr_Type() == Int_type
+	   return e1->get_Expr_Type() == Int_type && e2->get_Expr_Type() == Int_type
 		   ? Int_type : No_type;
    }
 
@@ -869,8 +867,7 @@ public:
 
    Type do_Check_Expr_Type()
    {
-	   return this->type =
-		   e1->get_Expr_Type() == Int_type && e2->get_Expr_Type() == Int_type
+	   return e1->get_Expr_Type() == Int_type && e2->get_Expr_Type() == Int_type
 		   ? Int_type : No_type;
    }
 
@@ -898,8 +895,7 @@ public:
 
    Type do_Check_Expr_Type()
    {
-	   return this->type =
-		   e1->get_Expr_Type() == Int_type && e2->get_Expr_Type() == Int_type
+	   return e1->get_Expr_Type() == Int_type && e2->get_Expr_Type() == Int_type
 		   ? Int_type : No_type;
    }
 
@@ -954,8 +950,7 @@ public:
 
    Type do_Check_Expr_Type()
    {
-	   return this->type =
-		   e1->get_Expr_Type() == Int_type &&
+	   return e1->get_Expr_Type() == Int_type &&
 		   e2->get_Expr_Type() == Int_type
 		   ? Bool_type : No_type;
    }
@@ -986,17 +981,17 @@ public:
    {
 	   Type type1 = e1->get_Expr_Type();
 	   Type type2 = e2->get_Expr_Type();
-	   this->type = type1 && type2 ? Bool_type : No_type;
+	   Type ret = type1 && type2 ? Bool_type : No_type;
 
 	   if ( ( type1 != type2) &&
 			   ( type1 == Int_type || type2 == Int_type ||
 			     type1 == Str_type || type2 == Str_type ||
 			     type1 == Bool_type || type2 == Bool_type))
 	   {
-		   this->type = No_type;
+		   ret  = No_type;
 	   }
 
-	   return this->type;
+	   return ret;
    }
 
 #ifdef Expression_SHARED_EXTRAS
@@ -1023,8 +1018,7 @@ public:
 
    Type do_Check_Expr_Type()
    {
-	   return this->type =
-		   e1->get_Expr_Type() == Int_type &&
+	   return e1->get_Expr_Type() == Int_type &&
 		   e1->get_Expr_Type() == Int_type
 		   ? Bool_type : No_type;
    }
@@ -1051,7 +1045,7 @@ public:
 
    Type do_Check_Expr_Type()
    {
-	   return this->type = e1->get_Expr_Type() == Bool_type ? Bool_type : No_type;
+	   return e1->get_Expr_Type() == Bool_type ? Bool_type : No_type;
    }
 
 #ifdef Expression_SHARED_EXTRAS
@@ -1076,7 +1070,7 @@ public:
 
    Type do_Check_Expr_Type()
    {
-	   return this->type = Int_type;
+	   return Int_type;
    }
 
 #ifdef Expression_SHARED_EXTRAS
@@ -1101,7 +1095,7 @@ public:
 
    Type do_Check_Expr_Type()
    {
-	   return this->type = Bool_type;
+	   return Bool_type;
    }
 
 #ifdef Expression_SHARED_EXTRAS
@@ -1126,7 +1120,7 @@ public:
 
    Type do_Check_Expr_Type()
    {
-	   return this->type = Str_type;
+	   return Str_type;
    }
 
 #ifdef Expression_SHARED_EXTRAS
@@ -1179,7 +1173,7 @@ public:
 
    Type do_Check_Expr_Type()
    {
-	   return this->type = e1->get_Expr_Type() ? Bool_type : No_type;
+	   return e1->get_Expr_Type() ? Bool_type : No_type;
    }
 
 #ifdef Expression_SHARED_EXTRAS
@@ -1207,7 +1201,7 @@ public:
 
    Type do_Check_Expr_Type()
    {
-	   return this->type = No_type;
+	   return No_type;
    }
 
 #ifdef Expression_SHARED_EXTRAS
