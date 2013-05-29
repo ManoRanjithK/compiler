@@ -42,6 +42,7 @@ extern Type Current_type;
 // Env vars.
 extern symtable_type *class_table;
 extern symtable_type *var_table;
+extern method_table_type *method_table;
 
 Type lookup_install_type( Symbol name)
 {
@@ -117,6 +118,7 @@ struct class_tree_node_type {
 	void set_contain( class_tree_node contain)
 	{
 		this->contain = contain;
+		::method_table = this->method_table;
 		return contain->collect_Features();
 	}
 

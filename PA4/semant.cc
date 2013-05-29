@@ -15,6 +15,7 @@ symtable_type vartable;
 
 symtable_type *class_table = &symtable;
 symtable_type *var_table = &vartable;
+method_table_type *method_table;
 
 //////////////////////////////////////////////////////////////////////
 //
@@ -522,3 +523,262 @@ Type branch_class::check_Case_Type( Type path_type)
 	return ret;
 }
 
+Type assign_class::do_Check_Expr_Type()
+{
+	Type n1 = var_table->lookup( name);
+	Type n2 = expr->get_Expr_Type();
+
+	return n1 && n1->is_defined() && n2 && n2->is_subtype_of( n1) ? n2 : No_type;
+}
+
+Type check_dispatch( Type caller, Type real_caller, Expressions actual)
+{
+	class_method *types = real_caller->find_method( name);
+	Type ret_type = types->hd();
+	ret_type = ret_type == Self_type ? caller : ret_type;
+
+	types = types->tl();
+
+	int i = act_type->first();
+	while ( actual->more( i) && types)
+	{
+		Expression expr = actual->nth( i);
+		Type act_type = expr->get_Expr_Type();
+		Type para_type = types->hd();
+
+		if ( act_type && para_type && para_type->is_defined() &&
+				act_type->is_subtype_of( para_type))
+		{
+			types = types->tl(), i = actual->next( i);
+		}
+		else
+		{
+			break;
+		}
+	}
+	if ( actual->more( i) || types)
+	{
+		return No_type;
+	}
+
+	return ret_type;
+}
+
+Type static_dispatch_class::do_Check_Expr_Type()
+{
+	Type caller = expr->get_Expr_Type();
+	Type real_caller = class_table->lookup( type_name);
+	if ( !real_caller || !real_caller->is_defined() ||
+			!caller || !caller->is_subtype_of( real_caller))
+	{
+		// What's the fuck with caller.
+		return No_type;
+	}
+
+	return check_dispatch( caller, real_caller, actual);
+}
+
+Type dispatch_class::do_Check_Expr_Type()
+{
+	Type caller = expr->get_Expr_Type();
+	if ( !caller)
+	{
+		// What's the fuck with caller.
+		return No_type;
+	}
+
+	Type real_caller = caller == Self_type ? Current_type : caller;
+
+	return check_dispatch( caller, real_caller, actual);
+}
+
+Type cond_class::do_Check_Expr_Type()
+{
+	Type then_type = then_exp->get_Expr_Type();
+	Type else_type = else_exp->get_Expr_Type();
+	return pred->get_Expr_Type() == Bool_type &&
+		then_type && else_type
+		? find_lca( then_type, else_type) : No_type;
+}
+
+Type loop_class::do_Check_Expr_Type()
+{
+	return pred->get_Expr_Type() == Bool_type && body->get_Expr_Type()
+		? Object_type : No_type;
+}
+
+Type typcase_class::do_Check_Expr_Type()
+{
+	Type path_type = expr->get_Expr_Type();
+	Type value_type = No_type;
+	if ( path_type)
+	{
+		for ( int i = cases->first(); cases->more( i); i = cases->next( i))
+		{
+			Case br = cases->nth( i);
+			Type br_type = br->check_Case_Type( path_type);
+			if ( !br_type)
+			{
+				value_type = No_type;
+			}
+			else
+			{
+				if ( value_type)
+				{
+					value_type = find_lca( value_type, br_type);
+				}
+				else
+				{
+					value_type = br_type;
+				}
+			}
+
+			if ( !value_type)
+			{
+				break;
+			}
+		}
+	}
+
+	return value_type;
+}
+
+Type block_class::do_Check_Expr_Type()
+{
+	Type ret = Object_type;
+	for ( int i = body->first(); body->more( i) && ret; i = body->next( i))
+	{
+		ret = body->nth(i)->get_Expr_Type();
+	}
+	return ret;
+}
+
+Type let_class::do_Check_Expr_Type()
+{
+	Type id_type = class_table->lookup( type_decl);
+	id_type = id_type == Self_type ? Current_type : id_type;
+	Type expr_type = init->is_no_expr() ? init->get_Expr_Type() : id_type;
+
+	Type ret = No_type;
+	if ( id_type && id_type->is_defined() &&
+			expr_type && expr_type->is_subtype_of( id_type))
+	{
+		var_table->enter_scope();
+		var_table->addid( identifier, id_type);
+
+		Type body_type = body->get_Expr_Type();
+
+		if ( body_type && body_type->is_defined())
+		{
+			ret = body_type;
+		}
+		var_table->exit_scope();
+	}
+
+	return ret;
+}
+
+Type check_Arith( Expression e1, Expression e2)
+{
+	return e1->get_Expr_Type() == Int_type && e2->get_Expr_Type() == Int_type
+		? Int_type : No_type;
+}
+Type plus_class::do_Check_Expr_Type()
+{
+	return check_Arith(e1, e2);
+}
+
+Type sub_class::do_Check_Expr_Type()
+{
+	return check_Arith(e1, e2);
+}
+
+Type mul_class::do_Check_Expr_Type()
+{
+	return check_Arith(e1, e2);
+}
+
+Type divide_class::do_Check_Expr_Type()
+{
+	return check_Arith(e1, e2);
+}
+
+Type neg_class::do_Check_Expr_Type()
+{
+	return e1->get_Expr_Type() == Int_type ? Int_type : No_type;
+}
+
+Type lt_class::do_Check_Expr_Type()
+{
+	return e1->get_Expr_Type() == Int_type &&
+		e2->get_Expr_Type() == Int_type
+		? Bool_type : No_type;
+}
+
+Type eq_class::do_Check_Expr_Type()
+{
+	Type type1 = e1->get_Expr_Type();
+	Type type2 = e2->get_Expr_Type();
+	Type ret = type1 && type2 ? Bool_type : No_type;
+
+	if ( ( type1 != type2) &&
+			( type1 == Int_type || type2 == Int_type ||
+			  type1 == Str_type || type2 == Str_type ||
+			  type1 == Bool_type || type2 == Bool_type))
+	{
+		ret  = No_type;
+	}
+
+	return ret;
+}
+
+Type leq_class::do_Check_Expr_Type()
+{
+	return e1->get_Expr_Type() == Int_type &&
+		e1->get_Expr_Type() == Int_type
+		? Bool_type : No_type;
+}
+
+Type comp_class::do_Check_Expr_Type()
+{
+	return e1->get_Expr_Type() == Bool_type ? Bool_type : No_type;
+}
+
+Type int_const_class::do_Check_Expr_Type()
+{
+	return Int_type;
+}
+
+Type bool_const_class::do_Check_Expr_Type()
+{
+	return Bool_type;
+}
+
+Type string_const_class::do_Check_Expr_Type()
+{
+	return Str_type;
+}
+
+Type new__class::do_Check_Expr_Type()
+{
+	Type type = class_table->lookup( type_name);
+	type = type == Self_type ? Current_type : Self_type;
+
+	return type && type->is_defined() ? type : No_type;
+}
+
+Type isvoid_class::do_Check_Expr_Type()
+{
+	return e1->get_Expr_Type() ? Bool_type : No_type;
+}
+
+Type no_expr_class::do_Check_Expr_Type()
+{
+	return No_type;
+}
+
+Type object_class::do_Check_Expr_Type()
+{
+	Type ret = var_table->lookup( name);
+	return ret && ret->is_defined() ? ret : No_type;
+}
