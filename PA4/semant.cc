@@ -149,6 +149,8 @@ ClassTable::ClassTable(Classes classes) : semant_errors(0) , error_stream(cerr) 
 
 	install_basic_classes();
 	class_tree_node root = class_table->probe( Object);
+
+	class_table->dump();
 	if ( !root)
 	{
 		// Find bug: No root !
@@ -192,6 +194,8 @@ ClassTable::ClassTable(Classes classes) : semant_errors(0) , error_stream(cerr) 
 	}
 
 	root->walk_down();
+
+	class_table->dump();
 
 	class_table->exitscope();
 }
@@ -532,22 +536,13 @@ void attr_class::install_Feature_Types()
 
 Type formal_class::collect_Formal_Type()
 {
-	ext_type = var_table->probe( name);
-	if ( ext_type == NULL)
-	{
-		ext_type = lookup_install_type( type_decl);
-	}
-	else
-	{
-		ext_type = Null_type;
-	}
-
+	ext_type = lookup_install_type( type_decl);
 	return ext_type;
 }
 
 bool formal_class::check_Formal_Type()
 {
-	return ext_type && ext_type->is_defined();
+	return ext_type && ext_type->is_defined() && var_table->probe( name) == NULL;
 }
 
 void formal_class::install_Formal_Type()
