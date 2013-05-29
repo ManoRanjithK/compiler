@@ -22,11 +22,10 @@ typedef ClassTable *ClassTableP;
 // methods.
 
 struct class_tree_node_type;
-
+typedef class_tree_node_type *class_tree_node;
 typedef class_tree_node Type;
 
 typedef List<class_tree_node_type> class_method_type;
-typedef class_tree_node_type *class_tree_node;
 typedef class_method_type *class_method;
 
 typedef SymbolTable< Symbol, class_tree_node_type> symtable_type;
