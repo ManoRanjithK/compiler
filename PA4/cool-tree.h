@@ -11,6 +11,7 @@
 
 #include "tree.h"
 #include "cool-tree.handcode.h"
+#include "semant.h"
 
 
 // define the class for phylum
@@ -36,6 +37,9 @@ public:
    tree_node *copy()		 { return copy_Class_(); }
    virtual Class_ copy_Class_() = 0;
 
+   virtual void collect_Methods( method_table_type *method_table) = 0;
+   virtual bool check_Class_Types() = 0;
+
 #ifdef Class__EXTRAS
    Class__EXTRAS
 #endif
@@ -46,9 +50,14 @@ public:
 typedef class Feature_class *Feature;
 
 class Feature_class : public tree_node {
+   Type feature_type;
 public:
    tree_node *copy()		 { return copy_Feature(); }
    virtual Feature copy_Feature() = 0;
+
+   virtual void collect_Feature_Types( method_table_type *) = 0;
+   virtual bool check_Feature_Types() = 0;
+   virtual void install_Feature_Types() = 0;
 
 #ifdef Feature_EXTRAS
    Feature_EXTRAS
@@ -64,6 +73,10 @@ public:
    tree_node *copy()		 { return copy_Formal(); }
    virtual Formal copy_Formal() = 0;
 
+   virtual Type collect_Formal_Type() = 0;
+   virtual bool check_Formal_Type() = 0;
+   virtual void install_Formal_Type() = 0;
+
 #ifdef Formal_EXTRAS
    Formal_EXTRAS
 #endif
@@ -74,9 +87,27 @@ public:
 typedef class Expression_class *Expression;
 
 class Expression_class : public tree_node {
+   Type   type;
+   bool   checked;
 public:
    tree_node *copy()		 { return copy_Expression(); }
    virtual Expression copy_Expression() = 0;
+
+   virtual Type do_Check_Expr_Type() = 0;
+   Type get_Expr_Type()
+   {
+	   if ( !checked)
+	   {
+		   type = do_Check_Expr_Type();
+		   checked = true;
+	   }
+	   return type;
+   }
+
+   virtual bool is_no_expr() const
+   {
+	   return false;
+   }
 
 #ifdef Expression_EXTRAS
    Expression_EXTRAS
@@ -162,6 +193,34 @@ public:
    Class_ copy_Class_();
    void dump(ostream& stream, int n);
 
+   void collect_Methods( method_table_type *method_table)
+   {
+	   for ( int i = features->first(); features->more( i); i = features->next( i))
+	   {
+		   features->nth( i)->collect_Feature_Types( method_table);
+	   }
+   }
+
+   bool check_Class_Types()
+   {
+	   for ( int i = features->first(); features->more( i); i = features->next( i))
+	   {
+		   Feature ft = features->nth( i);
+		   ft->install_Feature_Types();
+	   }
+
+	   for ( int i = features->first(); features->more( i); i = features->next( i))
+	   {
+		   Feature ft = features->nth( i);
+		   if ( !ft->check_Feature_Types())
+		   {
+			   return false;
+		   }
+	   }
+
+	   return true;
+   }
+
 #ifdef Class__SHARED_EXTRAS
    Class__SHARED_EXTRAS
 #endif
@@ -188,6 +247,45 @@ public:
    Feature copy_Feature();
    void dump(ostream& stream, int n);
 
+   void collect_Feature_Types( method_table_type method_table)
+   {
+	   feature_type = class_table->lookup( return_type);
+	   List<class_tree_node_type> *syms = new List<class_tree_node_type>( feature_type, NULL);
+	   for ( int i = formals.first(); formals->more( i); i = formals->next( i))
+	   {
+		   Type type = formals->nth( i)->collect_Formal_Type();
+		   syms = new List<class_tree_node_type>( type, syms);
+	   }
+
+	   method_table->addid( name, syms);
+   }
+
+   void install_Feature_Types()
+   {
+   }
+
+   bool check_Feature_Types()
+   {
+	   var_table->enter_scope();
+	   for ( int i = formals.first(); formals->more( i); i = formals->next( i))
+	   {
+		   Formal fm = formals->nth( i);
+		   if ( !fm->check_Formal_Type())
+		   {
+			   return false;
+		   }
+
+		   fm->install_Formal_Type();
+	   }
+
+	   Type type = feature_type;
+	   Type body_type = expr->get_Expr_Type();
+
+	   var_table->exit_scope();
+
+	   return type && type->is_defined() && body_type && body_type->is_subtype_of( type);
+   }
+
 #ifdef Feature_SHARED_EXTRAS
    Feature_SHARED_EXTRAS
 #endif
@@ -212,6 +310,24 @@ public:
    Feature copy_Feature();
    void dump(ostream& stream, int n);
 
+   void collect_Feature_Types( method_table_type *method_table)
+   {
+   }
+
+   bool check_Feature_Types()
+   {
+	   Type type = feature_type;
+	   Type t2 = init->is_no_expr() ? init->get_Expr_Type() : type;
+
+	   return type && type->is_defined() && t2 && t2->is_subtype_of( type);
+   }
+
+   void install_Feature_Types()
+   {
+	   feature_type = lookup_install_type( type_decl);
+	   var_table->addid( name, feature_type);
+   }
+
 #ifdef Feature_SHARED_EXTRAS
    Feature_SHARED_EXTRAS
 #endif
@@ -223,6 +339,7 @@ public:
 
 // define constructor - formal
 class formal_class : public Formal_class {
+   Type type;
 protected:
    Symbol name;
    Symbol type_decl;
@@ -233,6 +350,31 @@ public:
    }
    Formal copy_Formal();
    void dump(ostream& stream, int n);
+
+   Type collect_Formal_Type()
+   {
+	   type = val_table->probe( name);
+	   if ( type == NULL)
+	   {
+		   type = lookup_install_type( type_decl);
+	   }
+	   else
+	   {
+		   type = No_type;
+	   }
+
+	   return type;
+   }
+
+   bool check_Formal_Type()
+   {
+	   return type && type->is_defined();
+   }
+
+   void install_Formal_Type()
+   {
+	   var_table->addid( name, type);
+   }
 
 #ifdef Formal_SHARED_EXTRAS
    Formal_SHARED_EXTRAS
@@ -258,6 +400,28 @@ public:
    Case copy_Case();
    void dump(ostream& stream, int n);
 
+   Type check_Case_Type( Type path_type)
+   {
+	   Type id_type = class_table->lookup( type_decl);
+	   Type ret = No_type;
+
+	   if ( id_type && id_type->is_defined() &&
+			   ( id_type->is_subtype_of( path_type)
+			     || path_type->is_subtype_of( id_type)
+			     )
+	      )
+	   {
+		   var_table->enter_scope();
+		   var_table->addid( name, id_type);
+
+		   ret = expr->get_Expr_Type();
+
+		   var_table->exit_scope();
+	   }
+
+	   return ret;
+   }
+
 #ifdef Case_SHARED_EXTRAS
    Case_SHARED_EXTRAS
 #endif
@@ -279,6 +443,14 @@ public:
    }
    Expression copy_Expression();
    void dump(ostream& stream, int n);
+
+   Type do_Check_Expr_Type()
+   {
+	   Type n1 = var_table->lookup( name);
+	   Type n2 = expr->get_Expr_Type();
+
+	   return n1 && n1->is_defined() && n2 && n2->is_subtype_of( n1) ? n2 : No_type;
+   }
 
 #ifdef Expression_SHARED_EXTRAS
    Expression_SHARED_EXTRAS
@@ -306,6 +478,49 @@ public:
    Expression copy_Expression();
    void dump(ostream& stream, int n);
 
+   Type do_Check_Expr_Type()
+   {
+	   Type caller = expr->get_Expr_Type();
+	   Type real_caller = class_table->lookup( type_name);
+	   if ( !real_caller || !real_caller->is_defined() ||
+			   !caller || !caller->is_subtype_of( real_caller))
+	   {
+		   // What's the fuck with caller.
+		   return No_type;
+	   }
+
+	   // Copied from dispatch class.
+	   class_method *types = real_caller->find_method( name);
+	   Type ret_type = types->hd();
+	   ret_type = ret_type == Self_type ? caller : ret_type;
+
+	   types = types->tl();
+
+	   int i = act_type->first();
+	   while ( actual->more( i) && types && flag)
+	   {
+		   Expression expr = actual->nth( i);
+		   Type act_type = expr->get_Expr_Type();
+		   Type para_type = types->hd();
+
+		   if ( act_type && para_type && para_type->is_defined() &&
+				   act_type->is_subtype_of( para_type))
+		   {
+			   types = types->tl(), i = actual->next( i);
+		   }
+		   else
+		   {
+			   break;
+		   }
+	   }
+	   if ( actual->more( i) || types)
+	   {
+		   return No_type;
+	   }
+
+	   return ret_type == Self_type ? Current_type : ret_type;
+   }
+
 #ifdef Expression_SHARED_EXTRAS
    Expression_SHARED_EXTRAS
 #endif
@@ -329,6 +544,48 @@ public:
    }
    Expression copy_Expression();
    void dump(ostream& stream, int n);
+
+   Type do_Check_Expr_Type()
+   {
+	   Type caller = expr->get_Expr_Type();
+	   if ( !caller)
+	   {
+		   // What's the fuck with caller.
+		   return No_type;
+	   }
+
+	   Type real_caller = caller == Self_type ? Current_type : caller;
+
+	   class_method *types = real_caller->find_method( name);
+	   Type ret_type = types->hd();
+	   ret_type = ret_type == Self_type ? caller : ret_type;
+
+	   types = types->tl();
+
+	   int i = act_type->first();
+	   while ( actual->more( i) && types && flag)
+	   {
+		   Expression expr = actual->nth( i);
+		   Type act_type = expr->get_Expr_Type();
+		   Type para_type = types->hd();
+
+		   if ( act_type && para_type && para_type->is_defined() &&
+				   act_type->is_subtype_of( para_type))
+		   {
+			   types = types->tl(), i = actual->next( i);
+		   }
+		   else
+		   {
+			   break;
+		   }
+	   }
+	   if ( actual->more( i) || types)
+	   {
+		   return No_type;
+	   }
+
+	   return ret_type;
+   }
 
 #ifdef Expression_SHARED_EXTRAS
    Expression_SHARED_EXTRAS
@@ -354,6 +611,15 @@ public:
    Expression copy_Expression();
    void dump(ostream& stream, int n);
 
+   Type do_Check_Expr_Type()
+   {
+	   Type then_type = then_exp->get_Expr_Type();
+	   Type else_type = else_exp->get_Expr_Type();
+	   return pred->get_Expr_Type() == Bool_type &&
+		   then_type && else_type
+		   ? find_lca( then_type, else_type) : No_type;
+   }
+
 #ifdef Expression_SHARED_EXTRAS
    Expression_SHARED_EXTRAS
 #endif
@@ -375,6 +641,12 @@ public:
    }
    Expression copy_Expression();
    void dump(ostream& stream, int n);
+
+   Type do_Check_Expr_Type()
+   {
+	   return pred->get_Expr_Type() == Bool_type && body->get_Expr_Type()
+		   ? Object_type : No_type;
+   }
 
 #ifdef Expression_SHARED_EXTRAS
    Expression_SHARED_EXTRAS
@@ -398,6 +670,42 @@ public:
    Expression copy_Expression();
    void dump(ostream& stream, int n);
 
+   Type do_Check_Expr_Type()
+   {
+	   Type path_type = expr->get_Expr_Type();
+	   Type value_type = No_type;
+	   if ( path_type)
+	   {
+		   for ( int i = cases->first(); cases->more( i); i = cases->next( i))
+		   {
+			   Case br = cases->nth( i);
+			   Type br_type = br->check_Case_Type( path_type);
+			   if ( !br_type)
+			   {
+				   value_type = No_type;
+			   }
+			   else
+			   {
+				   if ( value_type)
+				   {
+					   value_type = find_lca( value_type, br_type);
+				   }
+				   else
+				   {
+					   value_type = br_type;
+				   }
+			   }
+
+			   if ( !value_type)
+			   {
+				   break;
+			   }
+		   }
+	   }
+
+	   return value_type;
+   }
+
 #ifdef Expression_SHARED_EXTRAS
    Expression_SHARED_EXTRAS
 #endif
@@ -417,6 +725,16 @@ public:
    }
    Expression copy_Expression();
    void dump(ostream& stream, int n);
+
+   Type do_Check_Expr_Type()
+   {
+	   Type ret = Object_type;
+	   for ( int i = body->first(); body->more( i) && ret; i = body->next( i))
+	   {
+		   ret = body->nth(i)->get_Expr_Type();
+	   }
+	   return ret;
+   }
 
 #ifdef Expression_SHARED_EXTRAS
    Expression_SHARED_EXTRAS
@@ -444,6 +762,31 @@ public:
    Expression copy_Expression();
    void dump(ostream& stream, int n);
 
+   Type do_Check_Expr_Type()
+   {
+	   Type id_type = class_table->lookup( type_decl);
+	   id_type = id_type == Self_type ? Current_type : id_type;
+	   Type expr_type = init->is_no_expr() ? init->get_Expr_Type() : id_type;
+
+	   Type ret = No_type;
+	   if ( id_type && id_type->is_defined() &&
+			   expr_type && expr_type->is_subtype_of( id_type))
+	   {
+		   var_table->enter_scope();
+		   var_table->addid( identifier, id_type);
+
+		   Type body_type = body->get_Expr_Type();
+
+		   if ( body_type && body_type->is_defined())
+		   {
+			   ret = body_type;
+		   }
+		   var_table->exit_scope();
+	   }
+
+	   return ret;
+   }
+
 #ifdef Expression_SHARED_EXTRAS
    Expression_SHARED_EXTRAS
 #endif
@@ -465,6 +808,13 @@ public:
    }
    Expression copy_Expression();
    void dump(ostream& stream, int n);
+
+   Type do_Check_Expr_Type()
+   {
+	   return this->type =
+		   e1->get_Expr_Type() == Int_type && e2->get_Expr_Type() == Int_type
+		   ? Int_type : No_type;
+   }
 
 #ifdef Expression_SHARED_EXTRAS
    Expression_SHARED_EXTRAS
@@ -488,6 +838,13 @@ public:
    Expression copy_Expression();
    void dump(ostream& stream, int n);
 
+   Type do_Check_Expr_Type()
+   {
+	   return this->type =
+		   e1->get_Expr_Type() == Int_type && e2->get_Expr_Type() == Int_type
+		   ? Int_type : No_type;
+   }
+
 #ifdef Expression_SHARED_EXTRAS
    Expression_SHARED_EXTRAS
 #endif
@@ -509,6 +866,13 @@ public:
    }
    Expression copy_Expression();
    void dump(ostream& stream, int n);
+
+   Type do_Check_Expr_Type()
+   {
+	   return this->type =
+		   e1->get_Expr_Type() == Int_type && e2->get_Expr_Type() == Int_type
+		   ? Int_type : No_type;
+   }
 
 #ifdef Expression_SHARED_EXTRAS
    Expression_SHARED_EXTRAS
@@ -532,6 +896,13 @@ public:
    Expression copy_Expression();
    void dump(ostream& stream, int n);
 
+   Type do_Check_Expr_Type()
+   {
+	   return this->type =
+		   e1->get_Expr_Type() == Int_type && e2->get_Expr_Type() == Int_type
+		   ? Int_type : No_type;
+   }
+
 #ifdef Expression_SHARED_EXTRAS
    Expression_SHARED_EXTRAS
 #endif
@@ -551,6 +922,13 @@ public:
    }
    Expression copy_Expression();
    void dump(ostream& stream, int n);
+
+   Type do_Check_Expr_Type()
+   {
+	   return this->typpe =
+		   e1->get_Expr_Type() == Int_type
+		   ? Int_type : No_type;
+   }
 
 #ifdef Expression_SHARED_EXTRAS
    Expression_SHARED_EXTRAS
@@ -574,6 +952,14 @@ public:
    Expression copy_Expression();
    void dump(ostream& stream, int n);
 
+   Type do_Check_Expr_Type()
+   {
+	   return this->type =
+		   e1->get_Expr_Type() == Int_type &&
+		   e2->get_Expr_Type() == Int_type
+		   ? Bool_type : No_type;
+   }
+
 #ifdef Expression_SHARED_EXTRAS
    Expression_SHARED_EXTRAS
 #endif
@@ -595,6 +981,23 @@ public:
    }
    Expression copy_Expression();
    void dump(ostream& stream, int n);
+
+   Type do_Check_Expr_Type()
+   {
+	   Type type1 = e1->get_Expr_Type();
+	   Type type2 = e2->get_Expr_Type();
+	   this->type = type1 && type2 ? Bool_type : No_type;
+
+	   if ( ( type1 != type2) &&
+			   ( type1 == Int_type || type2 == Int_type ||
+			     type1 == Str_type || type2 == Str_type ||
+			     type1 == Bool_type || type2 == Bool_type))
+	   {
+		   this->type = No_type;
+	   }
+
+	   return this->type;
+   }
 
 #ifdef Expression_SHARED_EXTRAS
    Expression_SHARED_EXTRAS
@@ -618,6 +1021,14 @@ public:
    Expression copy_Expression();
    void dump(ostream& stream, int n);
 
+   Type do_Check_Expr_Type()
+   {
+	   return this->type =
+		   e1->get_Expr_Type() == Int_type &&
+		   e1->get_Expr_Type() == Int_type
+		   ? Bool_type : No_type;
+   }
+
 #ifdef Expression_SHARED_EXTRAS
    Expression_SHARED_EXTRAS
 #endif
@@ -637,6 +1048,11 @@ public:
    }
    Expression copy_Expression();
    void dump(ostream& stream, int n);
+
+   Type do_Check_Expr_Type()
+   {
+	   return this->type = e1->get_Expr_Type() == Bool_type ? Bool_type : No_type;
+   }
 
 #ifdef Expression_SHARED_EXTRAS
    Expression_SHARED_EXTRAS
@@ -658,6 +1074,11 @@ public:
    Expression copy_Expression();
    void dump(ostream& stream, int n);
 
+   Type do_Check_Expr_Type()
+   {
+	   return this->type = Int_type;
+   }
+
 #ifdef Expression_SHARED_EXTRAS
    Expression_SHARED_EXTRAS
 #endif
@@ -677,6 +1098,11 @@ public:
    }
    Expression copy_Expression();
    void dump(ostream& stream, int n);
+
+   Type do_Check_Expr_Type()
+   {
+	   return this->type = Bool_type;
+   }
 
 #ifdef Expression_SHARED_EXTRAS
    Expression_SHARED_EXTRAS
@@ -698,6 +1124,11 @@ public:
    Expression copy_Expression();
    void dump(ostream& stream, int n);
 
+   Type do_Check_Expr_Type()
+   {
+	   return this->type = Str_type;
+   }
+
 #ifdef Expression_SHARED_EXTRAS
    Expression_SHARED_EXTRAS
 #endif
@@ -717,6 +1148,14 @@ public:
    }
    Expression copy_Expression();
    void dump(ostream& stream, int n);
+
+   Type do_Check_Expr_Type()
+   {
+	   Type type = class_table->lookup( type_name);
+	   type = type == Self_type ? Current_type : Self_type;
+
+	   return type && type->is_defined() ? type : No_type;
+   }
 
 #ifdef Expression_SHARED_EXTRAS
    Expression_SHARED_EXTRAS
@@ -738,6 +1177,11 @@ public:
    Expression copy_Expression();
    void dump(ostream& stream, int n);
 
+   Type do_Check_Expr_Type()
+   {
+	   return this->type = e1->get_Expr_Type() ? Bool_type : No_type;
+   }
+
 #ifdef Expression_SHARED_EXTRAS
    Expression_SHARED_EXTRAS
 #endif
@@ -755,6 +1199,16 @@ public:
    }
    Expression copy_Expression();
    void dump(ostream& stream, int n);
+
+   bool is_no_expr() const
+   {
+	   return true;
+   }
+
+   Type do_Check_Expr_Type()
+   {
+	   return this->type = No_type;
+   }
 
 #ifdef Expression_SHARED_EXTRAS
    Expression_SHARED_EXTRAS
@@ -775,6 +1229,12 @@ public:
    }
    Expression copy_Expression();
    void dump(ostream& stream, int n);
+
+   Type do_Check_Expr_Type()
+   {
+	   Type ret = var_table->lookup( name);
+	   return ret && ret->is_defined() ? ret : No_type;
+   }
 
 #ifdef Expression_SHARED_EXTRAS
    Expression_SHARED_EXTRAS
