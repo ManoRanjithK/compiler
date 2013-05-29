@@ -31,30 +31,8 @@ typedef class_method_type *class_method;
 typedef SymbolTable< Symbol, class_tree_node_type> symtable_type;
 typedef SymbolTable< Symbol, class_method_type> method_table_type;
 
-extern Type Object_type;
-extern Type Int_type;
-extern Type Bool_type;
-extern Type Str_type;
-extern Type No_type;
-extern Type Self_type;
-extern Type Current_type;
-
 // Env vars.
-extern symtable_type *class_table;
-extern symtable_type *var_table;
 extern method_table_type *method_table;
-
-Type lookup_install_type( Symbol name)
-{
-	   Type type = class_table->lookup( name);
-	   if ( type == NULL)
-	   {
-		   type = new Type( NULL);
-		   class_table->addid( name, type);
-	   }
-
-	   return type;
-}
 
 class ClassTable {
 private:
@@ -78,7 +56,7 @@ struct class_tree_node_type {
 	class_tree_node father;
 	class_tree_node son;
 	class_tree_node sibling;
-	Type contain;
+	Class_ contain;
 	int depth;
 
 	method_table_type method_table;
@@ -92,17 +70,17 @@ struct class_tree_node_type {
 	public:
 	friend class_tree_node union_set( class_tree_node, class_tree_node);
 
-	class_tree_node_type( Type class_) :
+	class_tree_node_type( Class_ class_) :
 		set_head( this), set_rank( 0), set_size( 1),
-		contain( class_), depth( 0),
-		father( NULL), son( NULL), sibling( NULL)
+		father( NULL), son( NULL), sibling( NULL),
+		contain( class_), depth( 0)
 	{
-		method_table.enter_scope();
+		method_table.enterscope();
 	}
 
 	~class_tree_node_type()
 	{
-		method_table.exit_scope();
+		method_table.exitscope();
 	}
 
 	bool set_father( class_tree_node father)
@@ -115,21 +93,21 @@ struct class_tree_node_type {
 		return union_set( this, father);
 	}
 
-	void set_contain( class_tree_node contain)
+	void set_contain( Class_ contain)
 	{
 		this->contain = contain;
-		::method_table = this->method_table;
-		return contain->collect_Features();
+		::method_table = &this->method_table;
+		return contain->collect_Methods();
 	}
 
-	bool is_subtype_of( class_tree_node super) const
+	bool is_subtype_of( const class_tree_node_type *super) const
 	{
 		if ( !this->contain || !super->contain)
 		{
 			return false;
 		}
 
-		class_tree_node leg = this;
+		const class_tree_node_type *leg = this;
 		while ( leg->depth > super->depth)
 		{
 			leg = leg->father;
@@ -138,17 +116,10 @@ struct class_tree_node_type {
 		return leg == super;
 	}
 
-	Type defined() const
-	{
-		return contain ? this : No_type;
-	}
+	Type defined();
+	bool is_defined();
 
-	bool is_defined() const
-	{
-		return defined() != No_type;
-	}
-
-	class_method find_method( Symbol name) const
+	class_method find_method( Symbol name)
 	{
 		class_method ret = method_table.lookup( name);
 		return ret ? ret : ( father ? father->find_method( name) : NULL);
@@ -158,8 +129,6 @@ struct class_tree_node_type {
 
 	bool walk_down();
 };
-
-static class_tree_node union_set( class_tree_node first, class_tree_node second);
 
 #endif
 

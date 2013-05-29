@@ -12,6 +12,8 @@
 #include "tree.h"
 #include "cool-tree.handcode.h"
 
+struct class_tree_node_type;
+typedef class_tree_node_type *Type;
 
 // define the class for phylum
 // define simple phylum - Program
@@ -39,6 +41,9 @@ public:
    virtual void collect_Methods() = 0;
    virtual bool check_Class_Types() = 0;
 
+   virtual Symbol get_name() const = 0;
+   virtual Symbol get_parent_name() const = 0;
+
 #ifdef Class__EXTRAS
    Class__EXTRAS
 #endif
@@ -49,6 +54,7 @@ public:
 typedef class Feature_class *Feature;
 
 class Feature_class : public tree_node {
+protected:
    Type feature_type;
 public:
    tree_node *copy()		 { return copy_Feature(); }
@@ -86,22 +92,14 @@ public:
 typedef class Expression_class *Expression;
 
 class Expression_class : public tree_node {
-   Type   type;
+   Type   expr_type;
    bool   checked;
 public:
    tree_node *copy()		 { return copy_Expression(); }
    virtual Expression copy_Expression() = 0;
 
    virtual Type do_Check_Expr_Type() = 0;
-   Type get_Expr_Type()
-   {
-	   if ( !checked)
-	   {
-		   type = do_Check_Expr_Type();
-		   checked = true;
-	   }
-	   return type;
-   }
+   Type get_Expr_Type();
 
    virtual bool is_no_expr() const
    {
@@ -121,6 +119,8 @@ class Case_class : public tree_node {
 public:
    tree_node *copy()		 { return copy_Case(); }
    virtual Case copy_Case() = 0;
+
+   virtual Type check_Case_Type( Type path_type) = 0;
 
 #ifdef Case_EXTRAS
    Case_EXTRAS
@@ -191,6 +191,16 @@ public:
    }
    Class_ copy_Class_();
    void dump(ostream& stream, int n);
+
+   Symbol get_name() const
+   {
+	   return name;
+   }
+
+   Symbol get_parent_name() const
+   {
+	   return parent;
+   }
 
    void collect_Methods();
    bool check_Class_Types();
@@ -264,7 +274,7 @@ public:
 
 // define constructor - formal
 class formal_class : public Formal_class {
-   Type type;
+   Type ext_type;
 protected:
    Symbol name;
    Symbol type_decl;
@@ -848,7 +858,7 @@ public:
    Expression copy_Expression();
    void dump(ostream& stream, int n);
 
-   bool is_no_expr() const
+   virtual bool is_no_expr() const
    {
 	   return true;
    }

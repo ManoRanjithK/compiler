@@ -88,6 +88,18 @@ static void initialize_constants(void)
     val         = idtable.add_string("_val");
 }
 
+Type lookup_install_type( Symbol name)
+{
+	   Type type = class_table->lookup( name);
+	   if ( type == NULL)
+	   {
+		   type = new class_tree_node_type( NULL);
+		   class_table->addid( name, type);
+	   }
+
+	   return type;
+}
+
 class_tree_node find_lca( class_tree_node x, class_tree_node y)
 {
 	if ( !x || !y)
@@ -114,7 +126,7 @@ class_tree_node find_lca( class_tree_node x, class_tree_node y)
 	return x ? y : NULL;
 }
 
-static class_tree_node union_set( class_tree_node first, class_tree_node second)
+class_tree_node union_set( class_tree_node first, class_tree_node second)
 {
 	first = first->find_set();
 	second = second->find_set();
@@ -136,11 +148,19 @@ ClassTable::ClassTable(Classes classes) : semant_errors(0) , error_stream(cerr) 
 	class_table->enterscope();
 
 	install_basic_classes();
+	class_tree_node root = class_table->probe( Object);
+	if ( !root)
+	{
+		// Find bug: No root !
+		semant_error() << "BUG: Could not find object class." << endl;
+		return;
+	}
 
+	int cnt = root->set_size;
 	for ( int i = classes->first(); classes->more( i); i = classes->next( i))
 	{
-		Type cur = classes->nth(i);
-		class_tree_node ct_node = lookup_install_type( cur->name);
+		Class_ cur = classes->nth(i);
+		class_tree_node ct_node = lookup_install_type( cur->get_name());
 
 		if ( ct_node->contain == NULL)
 		{
@@ -149,23 +169,23 @@ ClassTable::ClassTable(Classes classes) : semant_errors(0) , error_stream(cerr) 
 		else
 		{
 			// Find error: Redefinition of class
-			semant_error( cur) << "Redefinition of Class " << cur->name;
+			semant_error( cur) << "Redefinition of Class " << cur->get_name() << endl;
 			return;
 		}
 
-		class_tree_node father_node = lookup_install_type( cur->parent);
+		class_tree_node father_node = lookup_install_type( cur->get_parent_name());
 
 		if ( !ct_node->set_father( father_node))
 		{
 			// Find error: cur could not be a subclass of father node.
-			semant_error( cur) << "Find inherit circle of Class " << cur->name
-				<< " and Class " << cur->parent;
+			semant_error( cur) << "Find inherit circle of Class " << cur->get_name()
+				<< " and Class " << cur->get_parent_name() << endl;
 			return;
 		}
+		++cnt;
 	}
 
-	class_tree_node root = class_table->probe( Object);
-	if ( !root)
+	if ( !root || root->set_size != cnt)
 	{
 		// Find bug: No Object Class!
 		return;
@@ -176,30 +196,12 @@ ClassTable::ClassTable(Classes classes) : semant_errors(0) , error_stream(cerr) 
 	class_table->exitscope();
 }
 
-bool class_tree_node_type::walk_down()
-{
-	var_table->enter_scope();
-	var_table->addid( self, this);
-
-	bool ret = is_defined() && this->contain->check_Class_Types();
-
-	class_tree_node leg = this->son;
-	while ( leg && ret)
-	{
-		ret = leg->walk_down();
-		leg = leg->sibling;
-	}
-
-	var_table->exit_scope();
-	return ret;
-}
-
 Type Object_type = NULL;
 Type IO_type = NULL;
 Type Int_type = NULL;
 Type Bool_type = NULL;
 Type Str_type = NULL;
-Type No_type = NULL;
+Type Null_type = NULL;
 
 Type Self_type = NULL;
 Type Current_type = NULL;
@@ -304,22 +306,27 @@ void ClassTable::install_basic_classes() {
 						      no_expr()))),
 	       filename);
     Class_ Self_class = class_( SELF_TYPE, Object, nil_Features(), filename);
+    Class_ No_class = class_( No_type, Object, nil_Features(), filename);
 
-    ::Object_type = new class_tree_node( Object_class);
+    ::Object_type = new class_tree_node_type( Object_class);
 
-    ::IO_type = new class_tree_node( IO_class);
+    ::IO_type = new class_tree_node_type( IO_class);
     ::IO_type->set_father( Object_type);
 
-    ::Int_type = new class_tree_node( Int_class);
+    ::Int_type = new class_tree_node_type( Int_class);
     ::Int_type->set_father( Object_type);
 
-    ::Bool_type = new class_tree_node( Bool_class);
+    ::Bool_type = new class_tree_node_type( Bool_class);
     ::Bool_type->set_father( Object_type);
 
-    ::Str_type = new class_tree_node( Str_class);
+    ::Str_type = new class_tree_node_type( Str_class);
     ::Str_type->set_father( Object_type);
 
-    ::Self_type = new class_tree_node( Self_class);
+    ::Self_type = new class_tree_node_type( Self_class);
+    ::Str_type->set_father( Object_type);
+
+    ::Null_type = new class_tree_node_type( No_class);
+    ::Str_type->set_father( Object_type);
 
     symtable.addid( Object, ::Object_type);
     symtable.addid( IO, ::IO_type);
@@ -327,6 +334,7 @@ void ClassTable::install_basic_classes() {
     symtable.addid( Bool, ::Bool_type);
     symtable.addid( Str, ::Str_type);
     symtable.addid( SELF_TYPE, ::Self_type);
+    symtable.addid( No_type, ::Null_type);
 }
 
 ////////////////////////////////////////////////////////////////////
@@ -363,6 +371,34 @@ ostream& ClassTable::semant_error()
 
 
 
+bool class_tree_node_type::walk_down()
+{
+	var_table->enterscope();
+	var_table->addid( self, this);
+
+	bool ret = is_defined() && this->contain->check_Class_Types();
+
+	class_tree_node leg = this->son;
+	while ( leg && ret)
+	{
+		ret = leg->walk_down();
+		leg = leg->sibling;
+	}
+
+	var_table->exitscope();
+	return ret;
+}
+
+Type class_tree_node_type::defined()
+{
+	return contain ? this : Null_type;
+}
+
+bool class_tree_node_type::is_defined()
+{
+	return defined() != Null_type;
+}
+
 /*   This is the entry point to the semantic checker.
 
      Your checker should do the following two things:
@@ -389,6 +425,24 @@ void program_class::semant()
 	cerr << "Compilation halted due to static semantic errors." << endl;
 	exit(1);
     }
+}
+
+Type Expression_class::get_Expr_Type()
+{
+	if ( !checked)
+	{
+		expr_type = do_Check_Expr_Type();
+		if ( expr_type)
+		{
+			set_type( expr_type->contain->get_name());
+		}
+		else
+		{
+			set_type( NULL);
+		}
+		checked = true;
+	}
+	return expr_type;
 }
 
 void class__class::collect_Methods()
@@ -423,7 +477,7 @@ void method_class::collect_Feature_Types()
 {
 	feature_type = class_table->lookup( return_type);
 	List<class_tree_node_type> *syms = new List<class_tree_node_type>( feature_type, NULL);
-	for ( int i = formals.first(); formals->more( i); i = formals->next( i))
+	for ( int i = formals->first(); formals->more( i); i = formals->next( i))
 	{
 		Type type = formals->nth( i)->collect_Formal_Type();
 		syms = new List<class_tree_node_type>( type, syms);
@@ -438,8 +492,8 @@ void method_class::install_Feature_Types()
 
 bool method_class::check_Feature_Types()
 {
-	var_table->enter_scope();
-	for ( int i = formals.first(); formals->more( i); i = formals->next( i))
+	var_table->enterscope();
+	for ( int i = formals->first(); formals->more( i); i = formals->next( i))
 	{
 		Formal fm = formals->nth( i);
 		if ( !fm->check_Formal_Type())
@@ -453,7 +507,7 @@ bool method_class::check_Feature_Types()
 	Type type = feature_type;
 	Type body_type = expr->get_Expr_Type();
 
-	var_table->exit_scope();
+	var_table->exitscope();
 
 	return type && type->is_defined() && body_type && body_type->is_subtype_of( type);
 }
@@ -478,33 +532,33 @@ void attr_class::install_Feature_Types()
 
 Type formal_class::collect_Formal_Type()
 {
-	type = val_table->probe( name);
-	if ( type == NULL)
+	ext_type = var_table->probe( name);
+	if ( ext_type == NULL)
 	{
-		type = lookup_install_type( type_decl);
+		ext_type = lookup_install_type( type_decl);
 	}
 	else
 	{
-		type = No_type;
+		ext_type = Null_type;
 	}
 
-	return type;
+	return ext_type;
 }
 
 bool formal_class::check_Formal_Type()
 {
-	return type && type->is_defined();
+	return ext_type && ext_type->is_defined();
 }
 
 void formal_class::install_Formal_Type()
 {
-	var_table->addid( name, type);
+	var_table->addid( name, ext_type);
 }
 
 Type branch_class::check_Case_Type( Type path_type)
 {
 	Type id_type = class_table->lookup( type_decl);
-	Type ret = No_type;
+	Type ret = Null_type;
 
 	if ( id_type && id_type->is_defined() &&
 			( id_type->is_subtype_of( path_type)
@@ -512,12 +566,12 @@ Type branch_class::check_Case_Type( Type path_type)
 			)
 	   )
 	{
-		var_table->enter_scope();
+		var_table->enterscope();
 		var_table->addid( name, id_type);
 
 		ret = expr->get_Expr_Type();
 
-		var_table->exit_scope();
+		var_table->exitscope();
 	}
 
 	return ret;
@@ -528,18 +582,18 @@ Type assign_class::do_Check_Expr_Type()
 	Type n1 = var_table->lookup( name);
 	Type n2 = expr->get_Expr_Type();
 
-	return n1 && n1->is_defined() && n2 && n2->is_subtype_of( n1) ? n2 : No_type;
+	return n1 && n1->is_defined() && n2 && n2->is_subtype_of( n1) ? n2 : Null_type;
 }
 
-Type check_dispatch( Type caller, Type real_caller, Expressions actual)
+Type check_dispatch( Type caller, Type real_caller, Symbol name, Expressions actual)
 {
-	class_method *types = real_caller->find_method( name);
+	class_method types = real_caller->find_method( name);
 	Type ret_type = types->hd();
 	ret_type = ret_type == Self_type ? caller : ret_type;
 
 	types = types->tl();
 
-	int i = act_type->first();
+	int i = actual->first();
 	while ( actual->more( i) && types)
 	{
 		Expression expr = actual->nth( i);
@@ -558,7 +612,7 @@ Type check_dispatch( Type caller, Type real_caller, Expressions actual)
 	}
 	if ( actual->more( i) || types)
 	{
-		return No_type;
+		return Null_type;
 	}
 
 	return ret_type;
@@ -572,10 +626,10 @@ Type static_dispatch_class::do_Check_Expr_Type()
 			!caller || !caller->is_subtype_of( real_caller))
 	{
 		// What's the fuck with caller.
-		return No_type;
+		return Null_type;
 	}
 
-	return check_dispatch( caller, real_caller, actual);
+	return check_dispatch( caller, real_caller, name, actual);
 }
 
 Type dispatch_class::do_Check_Expr_Type()
@@ -584,12 +638,12 @@ Type dispatch_class::do_Check_Expr_Type()
 	if ( !caller)
 	{
 		// What's the fuck with caller.
-		return No_type;
+		return Null_type;
 	}
 
 	Type real_caller = caller == Self_type ? Current_type : caller;
 
-	return check_dispatch( caller, real_caller, actual);
+	return check_dispatch( caller, real_caller, name, actual);
 }
 
 Type cond_class::do_Check_Expr_Type()
@@ -598,19 +652,19 @@ Type cond_class::do_Check_Expr_Type()
 	Type else_type = else_exp->get_Expr_Type();
 	return pred->get_Expr_Type() == Bool_type &&
 		then_type && else_type
-		? find_lca( then_type, else_type) : No_type;
+		? find_lca( then_type, else_type) : Null_type;
 }
 
 Type loop_class::do_Check_Expr_Type()
 {
 	return pred->get_Expr_Type() == Bool_type && body->get_Expr_Type()
-		? Object_type : No_type;
+		? Object_type : Null_type;
 }
 
 Type typcase_class::do_Check_Expr_Type()
 {
 	Type path_type = expr->get_Expr_Type();
-	Type value_type = No_type;
+	Type value_type = Null_type;
 	if ( path_type)
 	{
 		for ( int i = cases->first(); cases->more( i); i = cases->next( i))
@@ -619,7 +673,7 @@ Type typcase_class::do_Check_Expr_Type()
 			Type br_type = br->check_Case_Type( path_type);
 			if ( !br_type)
 			{
-				value_type = No_type;
+				value_type = Null_type;
 			}
 			else
 			{
@@ -659,11 +713,11 @@ Type let_class::do_Check_Expr_Type()
 	id_type = id_type == Self_type ? Current_type : id_type;
 	Type expr_type = init->is_no_expr() ? init->get_Expr_Type() : id_type;
 
-	Type ret = No_type;
+	Type ret = Null_type;
 	if ( id_type && id_type->is_defined() &&
 			expr_type && expr_type->is_subtype_of( id_type))
 	{
-		var_table->enter_scope();
+		var_table->enterscope();
 		var_table->addid( identifier, id_type);
 
 		Type body_type = body->get_Expr_Type();
@@ -672,7 +726,7 @@ Type let_class::do_Check_Expr_Type()
 		{
 			ret = body_type;
 		}
-		var_table->exit_scope();
+		var_table->exitscope();
 	}
 
 	return ret;
@@ -681,7 +735,7 @@ Type let_class::do_Check_Expr_Type()
 Type check_Arith( Expression e1, Expression e2)
 {
 	return e1->get_Expr_Type() == Int_type && e2->get_Expr_Type() == Int_type
-		? Int_type : No_type;
+		? Int_type : Null_type;
 }
 Type plus_class::do_Check_Expr_Type()
 {
@@ -705,28 +759,28 @@ Type divide_class::do_Check_Expr_Type()
 
 Type neg_class::do_Check_Expr_Type()
 {
-	return e1->get_Expr_Type() == Int_type ? Int_type : No_type;
+	return e1->get_Expr_Type() == Int_type ? Int_type : Null_type;
 }
 
 Type lt_class::do_Check_Expr_Type()
 {
 	return e1->get_Expr_Type() == Int_type &&
 		e2->get_Expr_Type() == Int_type
-		? Bool_type : No_type;
+		? Bool_type : Null_type;
 }
 
 Type eq_class::do_Check_Expr_Type()
 {
 	Type type1 = e1->get_Expr_Type();
 	Type type2 = e2->get_Expr_Type();
-	Type ret = type1 && type2 ? Bool_type : No_type;
+	Type ret = type1 && type2 ? Bool_type : Null_type;
 
 	if ( ( type1 != type2) &&
 			( type1 == Int_type || type2 == Int_type ||
 			  type1 == Str_type || type2 == Str_type ||
 			  type1 == Bool_type || type2 == Bool_type))
 	{
-		ret  = No_type;
+		ret  = Null_type;
 	}
 
 	return ret;
@@ -736,12 +790,12 @@ Type leq_class::do_Check_Expr_Type()
 {
 	return e1->get_Expr_Type() == Int_type &&
 		e1->get_Expr_Type() == Int_type
-		? Bool_type : No_type;
+		? Bool_type : Null_type;
 }
 
 Type comp_class::do_Check_Expr_Type()
 {
-	return e1->get_Expr_Type() == Bool_type ? Bool_type : No_type;
+	return e1->get_Expr_Type() == Bool_type ? Bool_type : Null_type;
 }
 
 Type int_const_class::do_Check_Expr_Type()
@@ -764,21 +818,21 @@ Type new__class::do_Check_Expr_Type()
 	Type type = class_table->lookup( type_name);
 	type = type == Self_type ? Current_type : Self_type;
 
-	return type && type->is_defined() ? type : No_type;
+	return type && type->is_defined() ? type : Null_type;
 }
 
 Type isvoid_class::do_Check_Expr_Type()
 {
-	return e1->get_Expr_Type() ? Bool_type : No_type;
+	return e1->get_Expr_Type() ? Bool_type : Null_type;
 }
 
 Type no_expr_class::do_Check_Expr_Type()
 {
-	return No_type;
+	return Null_type;
 }
 
 Type object_class::do_Check_Expr_Type()
 {
 	Type ret = var_table->lookup( name);
-	return ret && ret->is_defined() ? ret : No_type;
+	return ret && ret->is_defined() ? ret : Null_type;
 }
