@@ -11,7 +11,6 @@
 
 #include "tree.h"
 #include "cool-tree.handcode.h"
-#include "semant.h"
 
 
 // define the class for phylum
@@ -37,7 +36,7 @@ public:
    tree_node *copy()		 { return copy_Class_(); }
    virtual Class_ copy_Class_() = 0;
 
-   virtual void collect_Methods( method_table_type *method_table) = 0;
+   virtual void collect_Methods() = 0;
    virtual bool check_Class_Types() = 0;
 
 #ifdef Class__EXTRAS
@@ -55,7 +54,7 @@ public:
    tree_node *copy()		 { return copy_Feature(); }
    virtual Feature copy_Feature() = 0;
 
-   virtual void collect_Feature_Types( method_table_type *) = 0;
+   virtual void collect_Feature_Types() = 0;
    virtual bool check_Feature_Types() = 0;
    virtual void install_Feature_Types() = 0;
 
@@ -193,11 +192,11 @@ public:
    Class_ copy_Class_();
    void dump(ostream& stream, int n);
 
-   void collect_Methods( method_table_type *method_table)
+   void collect_Methods()
    {
 	   for ( int i = features->first(); features->more( i); i = features->next( i))
 	   {
-		   features->nth( i)->collect_Feature_Types( method_table);
+		   features->nth( i)->collect_Feature_Types();
 	   }
    }
 
@@ -247,7 +246,7 @@ public:
    Feature copy_Feature();
    void dump(ostream& stream, int n);
 
-   void collect_Feature_Types( method_table_type method_table)
+   void collect_Feature_Types()
    {
 	   feature_type = class_table->lookup( return_type);
 	   List<class_tree_node_type> *syms = new List<class_tree_node_type>( feature_type, NULL);
@@ -310,7 +309,7 @@ public:
    Feature copy_Feature();
    void dump(ostream& stream, int n);
 
-   void collect_Feature_Types( method_table_type *method_table)
+   void collect_Feature_Types()
    {
    }
 

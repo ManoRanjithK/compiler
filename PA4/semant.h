@@ -117,7 +117,7 @@ struct class_tree_node_type {
 	void set_contain( class_tree_node contain)
 	{
 		this->contain = contain;
-		return contain->collect_Features( &method_table, attr_table);
+		return contain->collect_Features();
 	}
 
 	bool is_subtype_of( class_tree_node super) const
