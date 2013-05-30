@@ -189,6 +189,11 @@ ClassTable::ClassTable(Classes classes) : semant_errors(0) , error_stream(cerr) 
 		}
 
 		class_tree_node father_node = lookup_install_type( cur->get_parent_name());
+		if ( ct_node != root && father_node == ct_node)
+		{
+			semant_error( cur) << "Class " << cur->get_name() <<
+				" count not be the super class of itself." << endl;
+		}
 
 		if ( !ct_node->set_father( father_node))
 		{
@@ -200,11 +205,14 @@ ClassTable::ClassTable(Classes classes) : semant_errors(0) , error_stream(cerr) 
 		++cnt;
 	}
 
-	root->walk_down();
+	if ( !root->walk_down())
+	{
+		semant_error() << " Find error while processing!." << endl;
+	}
 
 	if ( root->find_set()->set_size != cnt)
 	{
-		// Find bug: No Object Class!
+		// Find bug: Not all classes has a root.
 		return;
 	}
 
@@ -535,7 +543,7 @@ void attr_class::collect_Feature_Types()
 bool attr_class::check_Feature_Types()
 {
 	Type type = feature_type;
-	Type t2 = init->is_no_expr() ? init->get_Expr_Type() : type;
+	Type t2 = init->is_no_expr() ? type : init->get_Expr_Type();
 
 	return type && type->is_defined() && t2 && t2->is_subtype_of( type);
 }
@@ -719,7 +727,7 @@ Type let_class::do_Check_Expr_Type()
 {
 	Type id_type = class_table->lookup( type_decl);
 	id_type = id_type == Self_type ? Current_type : id_type;
-	Type expr_type = init->is_no_expr() ? init->get_Expr_Type() : id_type;
+	Type expr_type = init->is_no_expr() ? id_type : init->get_Expr_Type();
 
 	Type ret = Null_type;
 	if ( id_type && id_type->is_defined() &&
