@@ -25,8 +25,24 @@ struct class_tree_node_type;
 typedef class_tree_node_type *class_tree_node;
 typedef class_tree_node Type;
 
-typedef List<class_tree_node_type> class_method_type;
+struct class_method_type;
 typedef class_method_type *class_method;
+
+struct class_method_type
+{
+	private:
+	Type type;
+	class_method next;
+
+	public:
+	class_method_type( Type nt, class_method nn = NULL) : type( nt), next( nn) {}
+
+	Type hd() const { return type;}
+	class_method tl() const { return next;}
+
+	void set_hd( Type nt) { type = nt;}
+	void set_tl( class_method nn) { next = nn;}
+};
 
 typedef SymbolTable< Symbol, class_tree_node_type> symtable_type;
 typedef SymbolTable< Symbol, class_method_type> method_table_type;

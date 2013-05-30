@@ -228,6 +228,7 @@ ClassTable::ClassTable(Classes classes) : semant_errors(0) , error_stream(cerr) 
 
 	if ( root->find_set()->set_size != cnt)
 	{
+		semant_error() << " Find error while processing!." << endl;
 		// Find bug: Not all classes has a root.
 		return;
 	}
@@ -387,15 +388,19 @@ bool class_tree_node_type::walk_down()
 {
 	Current_type = this;
 
+	/*
 	cout << "Checking Class " << this->defined()->contain->get_name() << endl;
+	*/
 	var_table->enterscope();
 	var_table->addid( self, this);
 
+	/*
 	cout << "Var table:" << endl;
 	var_table->dump();
 
 	cout << "Method table:" << endl;
 	this->method_table.dump();
+	*/
 
 	bool ret = is_defined() && this->contain->check_Class_Types();
 
@@ -482,9 +487,11 @@ bool class__class::check_Class_Types()
 		ft->install_Feature_Types();
 	}
 
+	/*
 	cout << "Var table: " << endl;
 	var_table->dump();
 	cout << "Checking " << name << " Begins." << endl;
+	*/
 	for ( int i = features->first(); features->more( i); i = features->next( i))
 	{
 		Feature ft = features->nth( i);
@@ -493,7 +500,9 @@ bool class__class::check_Class_Types()
 			return false;
 		}
 	}
+	/*
 	cout << "Checking " << name << " Done." << endl;
+	*/
 
 	return true;
 }
@@ -502,11 +511,15 @@ void method_class::collect_Feature_Types()
 {
 	feature_type = lookup_install_type( return_type);
 
-	List<class_tree_node_type> *syms = new List<class_tree_node_type>( feature_type, NULL);
+	class_method syms = new class_method_type( feature_type);
+	class_method last = syms;
 	for ( int i = formals->first(); formals->more( i); i = formals->next( i))
 	{
 		Type type = formals->nth( i)->collect_Formal_Type();
-		syms = new List<class_tree_node_type>( type, syms);
+		class_method cur = new class_method_type( type);
+
+		last->set_tl( cur);
+		last = cur;
 	}
 
 	method_table->addid( name, syms);
@@ -519,8 +532,10 @@ void method_class::install_Feature_Types()
 bool method_class::check_Feature_Types()
 {
 	var_table->enterscope();
+	/*
 	class_table->dump();
 	cout << "Checking method " << name << endl;
+	*/
 	for ( int i = formals->first(); formals->more( i); i = formals->next( i))
 	{
 		Formal fm = formals->nth( i);
@@ -535,7 +550,9 @@ bool method_class::check_Feature_Types()
 	Type type = feature_type;
 	Type body_type = expr->get_Expr_Type();
 
+	/*
 	cout << "Checking method " << name << " done." << endl;
+	*/
 	var_table->exitscope();
 
 	// Well, we do not check body type.
@@ -556,7 +573,6 @@ bool attr_class::check_Feature_Types()
 
 void attr_class::install_Feature_Types()
 {
-	cout << "installing " << name << endl;
 	feature_type = lookup_install_type( type_decl);
 	var_table->addid( name, feature_type);
 }
