@@ -824,7 +824,7 @@ Type string_const_class::do_Check_Expr_Type()
 Type new__class::do_Check_Expr_Type()
 {
 	Type type = class_table->lookup( type_name);
-	type = type == Self_type ? Current_type : Self_type;
+	type = type == Self_type ? Current_type : type;
 
 	return type && type->is_defined() ? type : Null_type;
 }
