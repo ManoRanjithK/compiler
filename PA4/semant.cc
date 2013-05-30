@@ -158,6 +158,16 @@ class_tree_node union_set( class_tree_node first, class_tree_node second)
 	return new_root;
 }
 
+Type Object_type = NULL;
+Type IO_type = NULL;
+Type Int_type = NULL;
+Type Bool_type = NULL;
+Type Str_type = NULL;
+Type Null_type = NULL;
+
+Type Self_type = NULL;
+Type Current_type = NULL;
+
 ClassTable::ClassTable(Classes classes) : semant_errors(0) , error_stream(cerr) {
 	class_table->enterscope();
 
@@ -189,10 +199,16 @@ ClassTable::ClassTable(Classes classes) : semant_errors(0) , error_stream(cerr) 
 		}
 
 		class_tree_node father_node = lookup_install_type( cur->get_parent_name());
-		if ( ct_node != root && father_node == ct_node)
+		if ( father_node == ct_node)
 		{
 			semant_error( cur) << "Class " << cur->get_name() <<
 				" count not be the super class of itself." << endl;
+		}
+
+		if ( ct_node == Bool_type || ct_node == Int_type || ct_node == Str_type)
+		{
+			semant_error( cur) << "It's illegal to inherit from Class " <<
+				cur->get_parent_name() << endl;
 		}
 
 		if ( !ct_node->set_father( father_node))
@@ -218,16 +234,6 @@ ClassTable::ClassTable(Classes classes) : semant_errors(0) , error_stream(cerr) 
 
 	class_table->exitscope();
 }
-
-Type Object_type = NULL;
-Type IO_type = NULL;
-Type Int_type = NULL;
-Type Bool_type = NULL;
-Type Str_type = NULL;
-Type Null_type = NULL;
-
-Type Self_type = NULL;
-Type Current_type = NULL;
 
 void ClassTable::install_basic_classes() {
 
@@ -332,7 +338,6 @@ void ClassTable::install_basic_classes() {
     Class_ No_class = class_( No_type, Object, nil_Features(), filename);
 
     ::Object_type = lookup_install_type( Object, Object_class);
-    ::Object_type->set_father( Object_type);
 
     ::IO_type = lookup_install_type( IO, IO_class, Object_type);
     ::Int_type = lookup_install_type( Int, Int_class, Object_type);
@@ -340,6 +345,8 @@ void ClassTable::install_basic_classes() {
     ::Str_type = lookup_install_type( Str, Str_class, Object_type);
     ::Self_type = lookup_install_type( SELF_TYPE, Self_class);
     ::Null_type = lookup_install_type( No_type, No_class);
+
+    lookup_install_type( prim_slot, No_class);
 }
 
 ////////////////////////////////////////////////////////////////////
@@ -495,13 +502,12 @@ void method_class::collect_Feature_Types()
 {
 	feature_type = lookup_install_type( return_type);
 
-	List<class_tree_node_type> *syms = NULL;
+	List<class_tree_node_type> *syms = new List<class_tree_node_type>( feature_type, NULL);
 	for ( int i = formals->first(); formals->more( i); i = formals->next( i))
 	{
 		Type type = formals->nth( i)->collect_Formal_Type();
 		syms = new List<class_tree_node_type>( type, syms);
 	}
-	syms = new List<class_tree_node_type>( feature_type, syms);
 
 	method_table->addid( name, syms);
 }
