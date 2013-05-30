@@ -100,6 +100,20 @@ Type lookup_install_type( Symbol name)
 	   return type;
 }
 
+Type lookup_install_type( Symbol name, Class_ class_)
+{
+	Type type = lookup_install_type( name);
+	type->set_contain( class_);
+	return type;
+}
+
+Type lookup_install_type( Symbol name, Class_ class_, Type father_type)
+{
+	Type type = lookup_install_type( name, class_);
+	type->set_father( father_type);
+	return type;
+}
+
 class_tree_node find_lca( class_tree_node x, class_tree_node y)
 {
 	if ( !x || !y)
@@ -150,7 +164,6 @@ ClassTable::ClassTable(Classes classes) : semant_errors(0) , error_stream(cerr) 
 	install_basic_classes();
 	class_tree_node root = class_table->probe( Object);
 
-	class_table->dump();
 	if ( !root)
 	{
 		// Find bug: No root !
@@ -158,7 +171,7 @@ ClassTable::ClassTable(Classes classes) : semant_errors(0) , error_stream(cerr) 
 		return;
 	}
 
-	int cnt = root->set_size;
+	int cnt = root->find_set()->set_size;
 	for ( int i = classes->first(); classes->more( i); i = classes->next( i))
 	{
 		Class_ cur = classes->nth(i);
@@ -187,15 +200,13 @@ ClassTable::ClassTable(Classes classes) : semant_errors(0) , error_stream(cerr) 
 		++cnt;
 	}
 
-	if ( !root || root->set_size != cnt)
+	root->walk_down();
+
+	if ( root->find_set()->set_size != cnt)
 	{
 		// Find bug: No Object Class!
 		return;
 	}
-
-	root->walk_down();
-
-	class_table->dump();
 
 	class_table->exitscope();
 }
@@ -312,33 +323,15 @@ void ClassTable::install_basic_classes() {
     Class_ Self_class = class_( SELF_TYPE, Object, nil_Features(), filename);
     Class_ No_class = class_( No_type, Object, nil_Features(), filename);
 
-    ::Object_type = new class_tree_node_type( Object_class);
+    ::Object_type = lookup_install_type( Object, Object_class);
+    ::Object_type->set_father( Object_type);
 
-    ::IO_type = new class_tree_node_type( IO_class);
-    ::IO_type->set_father( Object_type);
-
-    ::Int_type = new class_tree_node_type( Int_class);
-    ::Int_type->set_father( Object_type);
-
-    ::Bool_type = new class_tree_node_type( Bool_class);
-    ::Bool_type->set_father( Object_type);
-
-    ::Str_type = new class_tree_node_type( Str_class);
-    ::Str_type->set_father( Object_type);
-
-    ::Self_type = new class_tree_node_type( Self_class);
-    ::Str_type->set_father( Object_type);
-
-    ::Null_type = new class_tree_node_type( No_class);
-    ::Str_type->set_father( Object_type);
-
-    symtable.addid( Object, ::Object_type);
-    symtable.addid( IO, ::IO_type);
-    symtable.addid( Int, ::Int_type);
-    symtable.addid( Bool, ::Bool_type);
-    symtable.addid( Str, ::Str_type);
-    symtable.addid( SELF_TYPE, ::Self_type);
-    symtable.addid( No_type, ::Null_type);
+    ::IO_type = lookup_install_type( IO, IO_class, Object_type);
+    ::Int_type = lookup_install_type( Int, Int_class, Object_type);
+    ::Bool_type = lookup_install_type( Bool, Bool_class, Object_type);
+    ::Str_type = lookup_install_type( Str, Str_class, Object_type);
+    ::Self_type = lookup_install_type( SELF_TYPE, Self_class);
+    ::Null_type = lookup_install_type( No_type, No_class);
 }
 
 ////////////////////////////////////////////////////////////////////
@@ -377,8 +370,17 @@ ostream& ClassTable::semant_error()
 
 bool class_tree_node_type::walk_down()
 {
+	Current_type = this;
+
+	cout << "Checking Class " << this->defined()->contain->get_name() << endl;
 	var_table->enterscope();
 	var_table->addid( self, this);
+
+	cout << "Var table:" << endl;
+	var_table->dump();
+
+	cout << "Method table:" << endl;
+	this->method_table.dump();
 
 	bool ret = is_defined() && this->contain->check_Class_Types();
 
@@ -465,6 +467,9 @@ bool class__class::check_Class_Types()
 		ft->install_Feature_Types();
 	}
 
+	cout << "Var table: " << endl;
+	var_table->dump();
+	cout << "Checking " << name << " Begins." << endl;
 	for ( int i = features->first(); features->more( i); i = features->next( i))
 	{
 		Feature ft = features->nth( i);
@@ -473,19 +478,22 @@ bool class__class::check_Class_Types()
 			return false;
 		}
 	}
+	cout << "Checking " << name << " Done." << endl;
 
 	return true;
 }
 
 void method_class::collect_Feature_Types()
 {
-	feature_type = class_table->lookup( return_type);
-	List<class_tree_node_type> *syms = new List<class_tree_node_type>( feature_type, NULL);
+	feature_type = lookup_install_type( return_type);
+
+	List<class_tree_node_type> *syms = NULL;
 	for ( int i = formals->first(); formals->more( i); i = formals->next( i))
 	{
 		Type type = formals->nth( i)->collect_Formal_Type();
 		syms = new List<class_tree_node_type>( type, syms);
 	}
+	syms = new List<class_tree_node_type>( feature_type, syms);
 
 	method_table->addid( name, syms);
 }
@@ -497,6 +505,8 @@ void method_class::install_Feature_Types()
 bool method_class::check_Feature_Types()
 {
 	var_table->enterscope();
+	class_table->dump();
+	cout << "Checking method " << name << endl;
 	for ( int i = formals->first(); formals->more( i); i = formals->next( i))
 	{
 		Formal fm = formals->nth( i);
@@ -511,9 +521,11 @@ bool method_class::check_Feature_Types()
 	Type type = feature_type;
 	Type body_type = expr->get_Expr_Type();
 
+	cout << "Checking method " << name << " done." << endl;
 	var_table->exitscope();
 
-	return type && type->is_defined() && body_type && body_type->is_subtype_of( type);
+	// Well, we do not check body type.
+	return type && type->is_defined() && body_type; //&& body_type->is_subtype_of( type);
 }
 
 void attr_class::collect_Feature_Types()
@@ -530,6 +542,7 @@ bool attr_class::check_Feature_Types()
 
 void attr_class::install_Feature_Types()
 {
+	cout << "installing " << name << endl;
 	feature_type = lookup_install_type( type_decl);
 	var_table->addid( name, feature_type);
 }
@@ -823,7 +836,8 @@ Type isvoid_class::do_Check_Expr_Type()
 
 Type no_expr_class::do_Check_Expr_Type()
 {
-	return Null_type;
+	// This would only be called when checking object method.
+	return Object_type;
 }
 
 Type object_class::do_Check_Expr_Type()

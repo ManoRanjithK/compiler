@@ -61,7 +61,6 @@ struct class_tree_node_type {
 
 	method_table_type method_table;
 
-	protected:
 	class_tree_node find_set()
 	{
 		return set_head == this ? this : set_head = set_head->find_set();
@@ -76,6 +75,10 @@ struct class_tree_node_type {
 		contain( class_), depth( 0)
 	{
 		method_table.enterscope();
+		if ( class_)
+		{
+			this->set_contain(class_);
+		}
 	}
 
 	~class_tree_node_type()
@@ -122,7 +125,7 @@ struct class_tree_node_type {
 	class_method find_method( Symbol name)
 	{
 		class_method ret = method_table.lookup( name);
-		return ret ? ret : ( father ? father->find_method( name) : NULL);
+		return ret ? ret : ( father != this ? father->find_method( name) : NULL);
 	}
 
 	friend class_tree_node find_lca( class_tree_node, class_tree_node);

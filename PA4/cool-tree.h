@@ -858,7 +858,7 @@ public:
    Expression copy_Expression();
    void dump(ostream& stream, int n);
 
-   virtual bool is_no_expr() const
+   bool is_no_expr() const
    {
 	   return true;
    }
