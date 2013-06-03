@@ -23,10 +23,34 @@ typedef ClassTable *ClassTableP;
 
 struct class_tree_node_type;
 typedef class_tree_node_type *class_tree_node;
-typedef class_tree_node Type;
 
 struct class_method_type;
 typedef class_method_type *class_method;
+
+class Type
+{
+	private:
+	class_tree_node node;
+
+	public:
+	Type( class_tree_node n = NULL);
+	Type( Type tn)
+	{
+		node = tn.node;
+	}
+
+	bool operator bool() const
+	{
+		return node->is_defined();
+	}
+
+	bool operator->() const
+	{
+		return node;
+	}
+
+	friend class_tree_node &operator=( class_tree_node &p, const Type &);
+};
 
 struct class_method_type
 {
@@ -42,6 +66,8 @@ struct class_method_type
 
 	void set_hd( Type nt) { type = nt;}
 	void set_tl( class_method nn) { next = nn;}
+
+	bool is_defined() const { return type; }
 };
 
 typedef SymbolTable< Symbol, class_tree_node_type> symtable_type;

@@ -167,6 +167,28 @@ Type Self_type = NULL;
 Type Current_type = NULL;
 Symbol filename;
 
+Type::Type( class_tree_node n = NULL) : node( n ? Null_type->()) {}
+
+bool operator==( const Expression &e, const Type &t)
+{
+	return e->get_Expr_Type == t;
+}
+
+bool operator!=( const Expression &e, const Type &t)
+{
+	return !(e == t);
+}
+
+const Type &operator=( const Type &t, const Expression &e)
+{
+	return t = e->get_Expr_Type();
+}
+
+class_tree_node &operator=( class_tree_node &p, const Type &t)
+{
+	return p = t.node;
+}
+
 ClassTable::ClassTable(Classes classes) : semant_errors(0) , error_stream(cerr) {
 	cls_table = this;
 	class_table = &symtable;
@@ -392,6 +414,11 @@ ostream& semant_error(Class_ c)
     return cls_table->semant_error(c->get_filename(),c);
 }
 
+ostream& semant_error(tree_node *t)
+{
+    return cls_table->semant_error( Current_type->contain->get_filename(), t);
+}
+
 ostream& semant_error(Symbol filename, tree_node *t)
 {
     return cls_table->semant_error( filename, t);
@@ -421,27 +448,26 @@ bool class_tree_node_type::walk_down()
 	this->method_table.dump();
 	*/
 
-	bool ret = is_defined() && this->contain->check_Class_Types();
-	if ( !is_defined())
+	if ( is_defined())
 	{
-		semant_error();
-		ret = true;
+		this->contain->check_Class_Types();
+	}
+	else
+	{
+		// Find an undefined class.
+		// Will be reported later.
 	}
 
+	bool ret = true;
 	class_tree_node leg = this->son;
-	while ( leg && ret)
+	while ( leg)
 	{
-		ret = leg->walk_down();
+		ret &= leg->walk_down();
 		leg = leg->sibling;
 	}
 
 	var_table->exitscope();
 	return ret;
-}
-
-bool type_defined( Type t)
-{
-	return t && t->is_defined();
 }
 
 /*   This is the entry point to the semantic checker.
@@ -516,7 +542,9 @@ bool class__class::check_Class_Types()
 		Feature ft = features->nth( i);
 		if ( !ft->check_Feature_Types())
 		{
-			return false;
+			// Do nothing.
+			// For attributes, lookup in variable table would return false.
+			// For methods, the same thing happens.
 		}
 	}
 	/*
@@ -558,12 +586,14 @@ bool method_class::check_Feature_Types()
 	for ( int i = formals->first(); formals->more( i); i = formals->next( i))
 	{
 		Formal fm = formals->nth( i);
-		if ( !fm->check_Formal_Type())
+		if ( fm->check_Formal_Type())
 		{
-			return false;
+			fm->install_Formal_Type();
 		}
-
-		fm->install_Formal_Type();
+		else
+		{
+			// Do nothing. Leave them for type checking when called.
+		}
 	}
 
 	Type type = feature_type;
@@ -574,7 +604,7 @@ bool method_class::check_Feature_Types()
 	*/
 	var_table->exitscope();
 
-	if ( type && type->is_defined())
+	if ( type)
 	{
 		if ( !body_type)
 		{
@@ -588,7 +618,7 @@ bool method_class::check_Feature_Types()
 	}
 
 	// Well, we do not check body type.
-	return type && type->is_defined() && body_type; //&& body_type->is_subtype_of( type);
+	return type && body_type; //&& body_type->is_subtype_of( type);
 }
 
 void attr_class::collect_Feature_Types()
@@ -600,12 +630,19 @@ bool attr_class::check_Feature_Types()
 	Type type = feature_type;
 	Type t2 = init->is_no_expr() ? type : init->get_Expr_Type();
 
-	if ( !type || !type->is_defined())
+	if ( !type)
 	{
 		semant_error( filename, this) << "Class " << this->type_decl << " is not defined." << endl;
 	}
+	else
+	{
+		if ( !t2 || !t2->is_subtype_of( type))
+		{
+			t2 = type;
+		}
+	}
 
-	return type && type->is_defined() && t2 && t2->is_subtype_of( type);
+	return t2;
 }
 
 void attr_class::install_Feature_Types()
@@ -622,7 +659,7 @@ Type formal_class::collect_Formal_Type()
 
 bool formal_class::check_Formal_Type()
 {
-	if ( !type_defined( ext_type))
+	if ( !ext_type)
 	{
 		semant_error( filename, this) << "Class " << this->type_decl << " is not defined." << endl;
 	}
@@ -630,7 +667,7 @@ bool formal_class::check_Formal_Type()
 	{
 		semant_error( filename, this) << "Formal name " << this->name << " has been defined." << endl;
 	}
-	return ext_type && ext_type->is_defined() && var_table->probe( name) == NULL;
+	return ext_type && var_table->probe( name) == NULL;
 }
 
 void formal_class::install_Formal_Type()
@@ -643,18 +680,12 @@ Type branch_class::check_Case_Type( Type path_type)
 	Type id_type = class_table->lookup( type_decl);
 	Type ret = Null_type;
 
-	if ( !type_defined( id_type))
+	if ( !id_type)
 	{
 		semant_error( filename, this) << "Class " << type_decl <<
 			" is not defined." << endl;
 	}
-
-	if ( id_type && id_type->is_defined() /* &&
-			( id_type->is_subtype_of( path_type)
-			  || path_type->is_subtype_of( id_type)
-			)
-			*/
-	   )
+	else
 	{
 		var_table->enterscope();
 		var_table->addid( name, id_type);
@@ -671,24 +702,25 @@ Type assign_class::do_Check_Expr_Type()
 {
 	Type n1 = var_table->lookup( name);
 	Type n2 = expr->get_Expr_Type();
-	if ( !type_defined( n1))
+	if ( !n1)
 	{
 		semant_error( filename, this) << "Variable " << name <<
 			" is not defined." << endl;
 	}
 	else
 	{
-		if ( n2->is_defined() && !n2->is_subtype_of( n1))
+		if ( n2 && !n2->is_subtype_of( n1))
 		{
 			semant_error( filename, this) << "Could not assign Class " << n2->contain->get_name() <<
 				" to " << " Class " << n1->contain->get_name() << endl;
+			n2 = n1;
 		}
 	}
 
-	return n1 && n1->is_defined() && n2 && n2->is_subtype_of( n1) ? n2 : Null_type;
+	return n2;
 }
 
-Type check_dispatch( Type caller, Type real_caller, Symbol name, Expressions actual)
+Type check_dispatch( Type caller, Type real_caller, Symbol name, Expressions actual, Expression e)
 {
 	class_method types = real_caller->find_method( name);
 	Type ret_type = types->hd();
@@ -703,7 +735,7 @@ Type check_dispatch( Type caller, Type real_caller, Symbol name, Expressions act
 		Type act_type = expr->get_Expr_Type();
 		Type para_type = types->hd();
 
-		if ( act_type && para_type && para_type->is_defined() &&
+		if ( act_type && para_type &&
 				act_type->is_subtype_of( para_type))
 		{
 			types = types->tl(), i = actual->next( i);
@@ -715,7 +747,27 @@ Type check_dispatch( Type caller, Type real_caller, Symbol name, Expressions act
 	}
 	if ( actual->more( i) || types)
 	{
-		return Null_type;
+		char *err_str;
+		if ( !actual->more( i))
+		{
+			err_str = "Too few arguments supplied.";
+		}
+		else
+		{
+			if ( types)
+			{
+				err_str = "Arguments mis match."
+			}
+			else
+			{
+				err_str = "Too much arguments supplied.";
+			}
+		}
+
+		semant_error( filename, e)
+			<< "Calls on method " << name << " on Class "
+			<< real_caller->contain->get_name() << " failed."
+			<< endl << "\t" << err_str << endl;
 	}
 
 	return ret_type;
@@ -725,14 +777,30 @@ Type static_dispatch_class::do_Check_Expr_Type()
 {
 	Type caller = expr->get_Expr_Type();
 	Type real_caller = class_table->lookup( type_name);
-	if ( !real_caller || !real_caller->is_defined() ||
-			!caller || !caller->is_subtype_of( real_caller))
+	if ( !real_caller || !caller || !caller->is_subtype_of( real_caller))
 	{
 		// What's the fuck with caller.
+		if ( !real_caller)
+		{
+			semant_error( filename, this)
+				<< "Could not find Class "
+				<< type_name << endl;
+		}
+		else
+		{
+			if ( caller)
+			{
+				semant_error( filename, this)
+					<< "Could not convert Class "
+					<< caller->contain->get_name()
+					<< " to Class "
+					<< type_name << endl;
+			}
+		}
 		return Null_type;
 	}
 
-	return check_dispatch( caller, real_caller, name, actual);
+	return check_dispatch( caller, real_caller, name, actual, this);
 }
 
 Type dispatch_class::do_Check_Expr_Type()
@@ -746,7 +814,7 @@ Type dispatch_class::do_Check_Expr_Type()
 
 	Type real_caller = caller == Self_type ? Current_type : caller;
 
-	return check_dispatch( caller, real_caller, name, actual);
+	return check_dispatch( caller, real_caller, name, actual, this);
 }
 
 Type cond_class::do_Check_Expr_Type()
@@ -764,7 +832,9 @@ Type loop_class::do_Check_Expr_Type()
 	{
 		semant_error( filename, this) << "Condition exprssions should be Bool." << endl;
 	}
-	body_type->get_Expr_Type();
+	body->get_Expr_Type();
+
+	// Errors should be handled in body;
 	return Object_type;
 }
 
@@ -778,7 +848,7 @@ Type typcase_class::do_Check_Expr_Type()
 		{
 			Case br = cases->nth( i);
 			Type br_type = br->check_Case_Type( path_type);
-			if ( !br_type->is_defined())
+			if ( !br_type)
 			{
 				value_type = Null_type;
 			}
@@ -794,7 +864,7 @@ Type typcase_class::do_Check_Expr_Type()
 				}
 			}
 
-			if ( !value_type->is_defined())
+			if ( !value_type)
 			{
 				break;
 			}
@@ -811,7 +881,7 @@ Type block_class::do_Check_Expr_Type()
 	{
 		ret = body->nth(i)->get_Expr_Type();
 	}
-	return ret ? ret : Null_type;
+	return ret;
 }
 
 Type let_class::do_Check_Expr_Type()
@@ -821,106 +891,120 @@ Type let_class::do_Check_Expr_Type()
 	Type expr_type = init->is_no_expr() ? id_type : init->get_Expr_Type();
 
 	Type ret = Null_type;
-	if ( id_type && id_type->is_defined() &&
-			expr_type && expr_type->is_subtype_of( id_type))
+	if ( id_type && expr_type && expr_type->is_subtype_of( id_type))
 	{
 		var_table->enterscope();
 		var_table->addid( identifier, id_type);
 
 		Type body_type = body->get_Expr_Type();
-
-		if ( body_type && body_type->is_defined())
+		if ( body_type)
 		{
 			ret = body_type;
 		}
+
 		var_table->exitscope();
+	}
+
+	if ( !id_type)
+	{
+		semant_error( filename, this)
+			<< "Could not find Class " << type_decl << endl;
+	}
+
+	if ( id_type && expr_type && !expr_type->is_subtype_of( id_type))
+	{
+		semant_error( filename, this)
+			<< "Could not initialize " << identifier
+			<< " of Class " << type_decl << " with Class "
+			<< expr_type->contain->get_name() << endl;
 	}
 
 	return ret;
 }
 
-Type check_Arith( Expression e1, Expression e2)
+Type check_Arith( Expression e1, Expression e2, char *name, Expression e)
 {
-	return e1->get_Expr_Type() == Int_type && e2->get_Expr_Type() == Int_type
-		? Int_type : Null_type;
+	if ( e1->get_Expr_Type() != Int_type)
+	{
+		semant_error( filename, e) << "Left operhand of operator "
+			<< name << " should be Int." << endl;
+	}
+	if ( e2->get_Expr_Type() != Int_type)
+	{
+		semant_error( filename, e) << "Right operhand of oprator"
+			<< name << " should be Int." << endl;
+	}
+
+	return Int_type;
 }
+
 Type plus_class::do_Check_Expr_Type()
 {
-	return check_Arith(e1, e2);
+	return check_Arith(e1, e2, "'+'", this);
 }
 
 Type sub_class::do_Check_Expr_Type()
 {
-	return check_Arith(e1, e2);
+	return check_Arith(e1, e2, "'-'", this);
 }
 
 Type mul_class::do_Check_Expr_Type()
 {
-	return check_Arith(e1, e2);
+	return check_Arith(e1, e2, "'*'", this);
 }
 
 Type divide_class::do_Check_Expr_Type()
 {
-	return check_Arith(e1, e2);
+	return check_Arith(e1, e2, "'/'", this);
 }
 
 Type neg_class::do_Check_Expr_Type()
 {
-	return e1->get_Expr_Type() == Int_type ? Int_type : Null_type;
+	if ( e1->get_Expr_Type() != Int_type)
+	{
+		semant_error( filename, this) << "Operhand of operator "
+			<< "'-' should be Int." << endl;
+	}
+	return Int_type;
 }
 
 Type lt_class::do_Check_Expr_Type()
 {
-	return e1->get_Expr_Type() == Int_type &&
-		e2->get_Expr_Type() == Int_type
-		? Bool_type : Null_type;
+	check_Arith( e1, e2, "'<'", this);
+	return Bool_type;
 }
 
 Type eq_class::do_Check_Expr_Type()
 {
+	check_Arith( e1, e2, "'='", this);
+
 	Type type1 = e1->get_Expr_Type();
 	Type type2 = e2->get_Expr_Type();
-	Type ret = type1 && type2 ? Bool_type : Null_type;
 
 	if ( ( type1 != type2) &&
 			( type1 == Int_type || type2 == Int_type ||
 			  type1 == Str_type || type2 == Str_type ||
 			  type1 == Bool_type || type2 == Bool_type))
 	{
-		ret  = Null_type;
-	}
-
-	return ret;
-}
-
-Type leq_class::do_Check_Expr_Type()
-{
-	/*
-	return e1->get_Expr_Type() == Int_type &&
-		e2->get_Expr_Type() == Int_type
-		? Bool_type : Null_type;
-		*/
-	if ( e1->get_Expr_Type() != Int_type)
-	{
-		semant_error( filename, this) << "Left operhand of '<=' should be int." << endl;
-	}
-	if ( e2->get_Expr_Type() != Int_type)
-	{
-		semant_error( filename, this) << "Right operhand of '<=' should be int." << endl;
+		semant_error( filename, this)
+			<< "Could not compare Int, Bool or String with other types"
+			<< endl;
 	}
 
 	return Bool_type;
 }
 
+Type leq_class::do_Check_Expr_Type()
+{
+	check_Arith( e1, e2, "'<='", this);
+	return Bool_type;
+}
+
 Type comp_class::do_Check_Expr_Type()
 {
-	/*
-	return e1->get_Expr_Type() == Bool_type ? Bool_type : Null_type;
-	*/
-	Type e_type = e1->get_Expr_Type();
-	if ( e_type != Bool_type)
+	if ( e1->get_Expr_Type() != Bool_type)
 	{
-		semant_error( filename, this) << "Operator '!' used on non-bool expression." << endl;
+		semant_error( filename, this) << "Operator '!' could only used on bool expression." << endl;
 	}
 
 	return Bool_type;
@@ -946,20 +1030,17 @@ Type new__class::do_Check_Expr_Type()
 	Type type = class_table->lookup( type_name);
 	type = type == Self_type ? Current_type : type;
 
-	if ( !type || !type->is_defined())
+	if ( !type)
 	{
 		semant_error( filename, this) << "Class " << type_name << " not defined." << endl;
 	}
 
-	return type && type->is_defined() ? type : Null_type;
+	return type;
 }
 
 Type isvoid_class::do_Check_Expr_Type()
 {
 	// Error must be resolved in e1.
-	/*
-	return e1->get_Expr_Type() ? Bool_type : Null_type;
-	*/
 	// Assuming it's always right.
 	e1->get_Expr_Type();
 	return Bool_type;
@@ -974,9 +1055,9 @@ Type no_expr_class::do_Check_Expr_Type()
 Type object_class::do_Check_Expr_Type()
 {
 	Type ret = var_table->lookup( name);
-	if ( !ret || !ret->is-defined())
+	if ( ret)
 	{
 		semant_error( filename, this) << "Variable " << name << " not defined." << endl;
 	}
-	return ret && ret->is_defined() ? ret : Null_type;
+	return ret;
 }

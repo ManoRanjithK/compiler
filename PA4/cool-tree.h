@@ -13,7 +13,7 @@
 #include "cool-tree.handcode.h"
 
 struct class_tree_node_type;
-typedef class_tree_node_type *Type;
+class Type;
 
 // define the class for phylum
 // define simple phylum - Program
