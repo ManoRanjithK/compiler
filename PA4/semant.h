@@ -56,6 +56,9 @@ private:
   void install_basic_classes();
   ostream& error_stream;
 
+  symtable_type symtable;
+  symtable_type vartable;
+
 public:
   ClassTable(Classes);
   int errors() { return semant_errors; }
@@ -121,7 +124,7 @@ struct class_tree_node_type {
 
 	bool is_subtype_of( const class_tree_node_type *super) const
 	{
-		if ( !this->contain || !super->contain)
+		if ( !is_defined() || !super->is_defined())
 		{
 			return false;
 		}
@@ -135,8 +138,15 @@ struct class_tree_node_type {
 		return leg == super;
 	}
 
-	Type defined();
-	bool is_defined();
+	bool is_defined() const
+	{
+		return contain && contain != Null_type;
+	}
+
+	bool operator bool() const
+	{
+		return is_defined();
+	}
 
 	class_method find_method( Symbol name)
 	{

@@ -10,12 +10,10 @@
 extern int semant_debug;
 extern char *curr_filename;
 
-symtable_type symtable;
-symtable_type vartable;
-
-symtable_type *class_table = &symtable;
-symtable_type *var_table = &vartable;
+symtable_type *class_table;
+symtable_type *var_table;
 method_table_type *method_table;
+ClassTable *cls_table;
 
 //////////////////////////////////////////////////////////////////////
 //
@@ -116,9 +114,9 @@ Type lookup_install_type( Symbol name, Class_ class_, Type father_type)
 
 class_tree_node find_lca( class_tree_node x, class_tree_node y)
 {
-	if ( !x || !y)
+	if ( !x->is_defined() || !y->is_defined())
 	{
-		return NULL;
+		return Null_type;
 	}
 
 	int depth = x->depth < y->depth ? x->depth : y->depth;
@@ -137,7 +135,7 @@ class_tree_node find_lca( class_tree_node x, class_tree_node y)
 		y = y->father;
 	}
 
-	return x ? y : NULL;
+	return x ? y : Null_type;
 }
 
 class_tree_node union_set( class_tree_node first, class_tree_node second)
@@ -167,8 +165,13 @@ Type Null_type = NULL;
 
 Type Self_type = NULL;
 Type Current_type = NULL;
+Symbol filename;
 
 ClassTable::ClassTable(Classes classes) : semant_errors(0) , error_stream(cerr) {
+	cls_table = this;
+	class_table = &symtable;
+	var_table = &vartable;
+
 	class_table->enterscope();
 
 	install_basic_classes();
@@ -205,7 +208,7 @@ ClassTable::ClassTable(Classes classes) : semant_errors(0) , error_stream(cerr) 
 				" count not be the super class of itself." << endl;
 		}
 
-		if ( ct_node == Bool_type || ct_node == Int_type || ct_node == Str_type)
+		if ( father_node == Bool_type || father_node == Int_type || father_node == Str_type)
 		{
 			semant_error( cur) << "It's illegal to inherit from Class " <<
 				cur->get_parent_name() << endl;
@@ -384,9 +387,25 @@ ostream& ClassTable::semant_error()
 
 
 
+ostream& semant_error(Class_ c)
+{
+    return cls_table->semant_error(c->get_filename(),c);
+}
+
+ostream& semant_error(Symbol filename, tree_node *t)
+{
+    return cls_table->semant_error( filename, t);
+}
+
+ostream& ClassTable::semant_error()
+{
+    return cls_table->semant_error();
+}
+
 bool class_tree_node_type::walk_down()
 {
-	Current_type = this;
+	::Current_type = this;
+	::filename = get_filename();
 
 	/*
 	cout << "Checking Class " << this->defined()->contain->get_name() << endl;
@@ -403,6 +422,11 @@ bool class_tree_node_type::walk_down()
 	*/
 
 	bool ret = is_defined() && this->contain->check_Class_Types();
+	if ( !is_defined())
+	{
+		semant_error();
+		ret = true;
+	}
 
 	class_tree_node leg = this->son;
 	while ( leg && ret)
@@ -415,14 +439,9 @@ bool class_tree_node_type::walk_down()
 	return ret;
 }
 
-Type class_tree_node_type::defined()
+bool type_defined( Type t)
 {
-	return contain ? this : Null_type;
-}
-
-bool class_tree_node_type::is_defined()
-{
-	return defined() != Null_type;
+	return t && t->is_defined();
 }
 
 /*   This is the entry point to the semantic checker.
@@ -555,6 +574,19 @@ bool method_class::check_Feature_Types()
 	*/
 	var_table->exitscope();
 
+	if ( type && type->is_defined())
+	{
+		if ( !body_type)
+		{
+			body_type = type;
+		}
+	}
+	else
+	{
+		semant_error( filename, this) << "Return type of " << this->name <<
+			" is not defined." << endl;
+	}
+
 	// Well, we do not check body type.
 	return type && type->is_defined() && body_type; //&& body_type->is_subtype_of( type);
 }
@@ -567,6 +599,11 @@ bool attr_class::check_Feature_Types()
 {
 	Type type = feature_type;
 	Type t2 = init->is_no_expr() ? type : init->get_Expr_Type();
+
+	if ( !type || !type->is_defined())
+	{
+		semant_error( filename, this) << "Class " << this->type_decl << " is not defined." << endl;
+	}
 
 	return type && type->is_defined() && t2 && t2->is_subtype_of( type);
 }
@@ -585,6 +622,14 @@ Type formal_class::collect_Formal_Type()
 
 bool formal_class::check_Formal_Type()
 {
+	if ( !type_defined( ext_type))
+	{
+		semant_error( filename, this) << "Class " << this->type_decl << " is not defined." << endl;
+	}
+	if ( var_table->probe( name))
+	{
+		semant_error( filename, this) << "Formal name " << this->name << " has been defined." << endl;
+	}
 	return ext_type && ext_type->is_defined() && var_table->probe( name) == NULL;
 }
 
@@ -598,10 +643,17 @@ Type branch_class::check_Case_Type( Type path_type)
 	Type id_type = class_table->lookup( type_decl);
 	Type ret = Null_type;
 
-	if ( id_type && id_type->is_defined() &&
+	if ( !type_defined( id_type))
+	{
+		semant_error( filename, this) << "Class " << type_decl <<
+			" is not defined." << endl;
+	}
+
+	if ( id_type && id_type->is_defined() /* &&
 			( id_type->is_subtype_of( path_type)
 			  || path_type->is_subtype_of( id_type)
 			)
+			*/
 	   )
 	{
 		var_table->enterscope();
@@ -612,13 +664,26 @@ Type branch_class::check_Case_Type( Type path_type)
 		var_table->exitscope();
 	}
 
-	return ret;
+	return ret ? ret : path_type;
 }
 
 Type assign_class::do_Check_Expr_Type()
 {
 	Type n1 = var_table->lookup( name);
 	Type n2 = expr->get_Expr_Type();
+	if ( !type_defined( n1))
+	{
+		semant_error( filename, this) << "Variable " << name <<
+			" is not defined." << endl;
+	}
+	else
+	{
+		if ( n2->is_defined() && !n2->is_subtype_of( n1))
+		{
+			semant_error( filename, this) << "Could not assign Class " << n2->contain->get_name() <<
+				" to " << " Class " << n1->contain->get_name() << endl;
+		}
+	}
 
 	return n1 && n1->is_defined() && n2 && n2->is_subtype_of( n1) ? n2 : Null_type;
 }
@@ -695,8 +760,12 @@ Type cond_class::do_Check_Expr_Type()
 
 Type loop_class::do_Check_Expr_Type()
 {
-	return pred->get_Expr_Type() == Bool_type && body->get_Expr_Type()
-		? Object_type : Null_type;
+	if ( pred->get_Expr_Type() != Bool_type)
+	{
+		semant_error( filename, this) << "Condition exprssions should be Bool." << endl;
+	}
+	body_type->get_Expr_Type();
+	return Object_type;
 }
 
 Type typcase_class::do_Check_Expr_Type()
@@ -709,7 +778,7 @@ Type typcase_class::do_Check_Expr_Type()
 		{
 			Case br = cases->nth( i);
 			Type br_type = br->check_Case_Type( path_type);
-			if ( !br_type)
+			if ( !br_type->is_defined())
 			{
 				value_type = Null_type;
 			}
@@ -725,7 +794,7 @@ Type typcase_class::do_Check_Expr_Type()
 				}
 			}
 
-			if ( !value_type)
+			if ( !value_type->is_defined())
 			{
 				break;
 			}
@@ -742,7 +811,7 @@ Type block_class::do_Check_Expr_Type()
 	{
 		ret = body->nth(i)->get_Expr_Type();
 	}
-	return ret;
+	return ret ? ret : Null_type;
 }
 
 Type let_class::do_Check_Expr_Type()
@@ -826,14 +895,35 @@ Type eq_class::do_Check_Expr_Type()
 
 Type leq_class::do_Check_Expr_Type()
 {
+	/*
 	return e1->get_Expr_Type() == Int_type &&
-		e1->get_Expr_Type() == Int_type
+		e2->get_Expr_Type() == Int_type
 		? Bool_type : Null_type;
+		*/
+	if ( e1->get_Expr_Type() != Int_type)
+	{
+		semant_error( filename, this) << "Left operhand of '<=' should be int." << endl;
+	}
+	if ( e2->get_Expr_Type() != Int_type)
+	{
+		semant_error( filename, this) << "Right operhand of '<=' should be int." << endl;
+	}
+
+	return Bool_type;
 }
 
 Type comp_class::do_Check_Expr_Type()
 {
+	/*
 	return e1->get_Expr_Type() == Bool_type ? Bool_type : Null_type;
+	*/
+	Type e_type = e1->get_Expr_Type();
+	if ( e_type != Bool_type)
+	{
+		semant_error( filename, this) << "Operator '!' used on non-bool expression." << endl;
+	}
+
+	return Bool_type;
 }
 
 Type int_const_class::do_Check_Expr_Type()
@@ -856,12 +946,23 @@ Type new__class::do_Check_Expr_Type()
 	Type type = class_table->lookup( type_name);
 	type = type == Self_type ? Current_type : type;
 
+	if ( !type || !type->is_defined())
+	{
+		semant_error( filename, this) << "Class " << type_name << " not defined." << endl;
+	}
+
 	return type && type->is_defined() ? type : Null_type;
 }
 
 Type isvoid_class::do_Check_Expr_Type()
 {
+	// Error must be resolved in e1.
+	/*
 	return e1->get_Expr_Type() ? Bool_type : Null_type;
+	*/
+	// Assuming it's always right.
+	e1->get_Expr_Type();
+	return Bool_type;
 }
 
 Type no_expr_class::do_Check_Expr_Type()
@@ -873,5 +974,9 @@ Type no_expr_class::do_Check_Expr_Type()
 Type object_class::do_Check_Expr_Type()
 {
 	Type ret = var_table->lookup( name);
+	if ( !ret || !ret->is-defined())
+	{
+		semant_error( filename, this) << "Variable " << name << " not defined." << endl;
+	}
 	return ret && ret->is_defined() ? ret : Null_type;
 }
