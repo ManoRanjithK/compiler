@@ -105,9 +105,9 @@ Type lookup_install_type( Symbol name, Class_ class_ = NULL, Type father_type = 
 
 class_tree_node find_lca( class_tree_node x, class_tree_node y)
 {
-	if ( !x->is_defined() || !y->is_defined())
+	if ( !x || !y)
 	{
-		return Null_type;
+		return NULL;
 	}
 
 	int depth = x->depth < y->depth ? x->depth : y->depth;
@@ -241,13 +241,14 @@ ClassTable::ClassTable(Classes classes) : semant_errors(0) , error_stream(cerr) 
 
 	if ( !root->walk_down())
 	{
-		semant_error() << " Find error while processing!." << endl;
+		semant_error() << "Find error while processing!" << endl;
 	}
 
 	if ( root->find_set()->set_size != cnt)
 	{
-		semant_error() << " Find error while processing!." << endl;
+		semant_error() << "Find error while processing!" << endl;
 		// Find bug: Not all classes has a root.
+		// Some classes must be undefined.
 		return;
 	}
 
