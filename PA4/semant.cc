@@ -262,6 +262,12 @@ ClassTable::ClassTable(Classes classes) : semant_errors(0) , error_stream(cerr) 
 				cur->get_parent_name() << endl;
 		}
 
+		if ( father_node == Self_type)
+		{
+			semant_error( cur) << "It's illegal to inherit from SELF_TYPE " << endl;
+			father_node = Object_type;
+		}
+
 		if ( !ct_node->set_father( father_node))
 		{
 			// Find error: cur could not be a subclass of father node.
@@ -1053,8 +1059,6 @@ Type lt_class::do_Check_Expr_Type()
 
 Type eq_class::do_Check_Expr_Type()
 {
-	check_Arith( e1, e2, "'='", this);
-
 	Type type1 = e1->get_Expr_Type();
 	Type type2 = e2->get_Expr_Type();
 
