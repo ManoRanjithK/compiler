@@ -475,7 +475,7 @@ bool class_tree_node_type::walk_down()
 	cout << "Checking Class " << this->defined()->contain->get_name() << endl;
 	*/
 	var_table->enterscope();
-	var_table->addid( self, this);
+	var_table->addid( self, Self_type);
 
 	/*
 	cout << "Var table:" << endl;
