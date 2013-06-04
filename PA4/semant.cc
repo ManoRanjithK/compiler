@@ -800,6 +800,11 @@ Type assign_class::do_Check_Expr_Type()
 	var_table->dump();
 	cout << endl;
 	*/
+	if ( name == self)
+	{
+		semant_error( filename, this)
+			<< "Assignment on self object." << endl;
+	}
 
 	Type n1 = var_table->lookup( name);
 	Type n2 = expr->get_Expr_Type();
