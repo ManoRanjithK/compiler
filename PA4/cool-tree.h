@@ -90,7 +90,7 @@ public:
 
    virtual void collect_Feature_Types() = 0;
    virtual bool check_Feature_Types() = 0;
-   virtual void install_Feature_Types() = 0;
+   virtual bool install_Feature_Types() = 0;
 
 #ifdef Feature_EXTRAS
    Feature_EXTRAS
@@ -260,7 +260,7 @@ public:
    void dump(ostream& stream, int n);
 
    void collect_Feature_Types();
-   void install_Feature_Types();
+   bool install_Feature_Types();
    bool check_Feature_Types();
 
 #ifdef Feature_SHARED_EXTRAS
@@ -288,7 +288,7 @@ public:
    void dump(ostream& stream, int n);
 
    void collect_Feature_Types();
-   void install_Feature_Types();
+   bool install_Feature_Types();
    bool check_Feature_Types();
 
 #ifdef Feature_SHARED_EXTRAS

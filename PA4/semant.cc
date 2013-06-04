@@ -609,8 +609,9 @@ void method_class::collect_Feature_Types()
 	method_table->addid( name, syms);
 }
 
-void method_class::install_Feature_Types()
+bool method_class::install_Feature_Types()
 {
+	return true;
 }
 
 bool method_class::check_Feature_Types()
@@ -683,10 +684,23 @@ bool attr_class::check_Feature_Types()
 	return t2;
 }
 
-void attr_class::install_Feature_Types()
+bool attr_class::install_Feature_Types()
 {
 	feature_type = lookup_install_type( type_decl);
-	var_table->addid( name, feature_type);
+
+	bool ret = !var_table->probe( name);
+	if ( ret)
+	{
+		var_table->addid( name, feature_type);
+	}
+	else
+	{
+		semant_error( filename, this)
+			<< " Attribute " << name << " has been defined."
+			<< endl;
+	}
+
+	return ret;
 }
 
 Type formal_class::collect_Formal_Type()
