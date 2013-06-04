@@ -138,22 +138,7 @@ struct class_tree_node_type {
 
 	friend class_tree_node find_lca( class_tree_node, class_tree_node);
 
-	void fill_depth()
-	{
-		if ( depth == -1)
-		{
-			if ( father)
-			{
-				father->fill_depth();
-				depth = father->depth + 1;
-			}
-			else
-			{
-				depth = 0;
-			}
-			find_set();
-		}
-	}
+	bool fill_depth();
 
 	static void fill_node_depth()
 	{

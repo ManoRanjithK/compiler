@@ -290,18 +290,7 @@ ClassTable::ClassTable(Classes classes) : semant_errors(0) , error_stream(cerr) 
 
 	class_tree_node_type::fill_node_depth();
 
-	if ( !root->walk_down())
-	{
-		semant_error() << "Find error while processing!" << endl;
-	}
-
-	if ( root->find_set()->set_size != cnt)
-	{
-		semant_error() << "Find error while processing!" << endl;
-		// Find bug: Not all classes has a root.
-		// Some classes must be undefined.
-		return;
-	}
+	root->walk_down();
 
 	if ( !class_table->lookup( Main))
 	{
@@ -485,6 +474,29 @@ class_tree_node class_tree_node_type::all_node_head = NULL;
 bool class_tree_node_type::is_defined() const
 {
 	return contain && this != Null_type;
+}
+
+bool class_tree_node_type::fill_depth()
+{
+	if ( depth == -1)
+	{
+		if ( father)
+		{
+			if ( !father->fill_depth())
+			{
+				semant_error( this->contain)
+					<< "Class " << name << " inherited from undefined Class "
+					<< father->name << "." << endl;
+			}
+			depth = father->depth + 1;
+		}
+		else
+		{
+			depth = 0;
+		}
+		find_set();
+	}
+	return this->contain;
 }
 
 bool class_tree_node_type::walk_down()
