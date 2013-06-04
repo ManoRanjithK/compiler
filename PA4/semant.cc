@@ -88,18 +88,28 @@ static void initialize_constants(void)
 
 Type lookup_install_type( Symbol name, Class_ class_ = NULL, Type father_type = NULL)
 {
-	   Type type = class_table->lookup( name);
-	   if ( type)
+	   class_tree_node type = class_table->lookup( name);
+	   if ( !type)
 	   {
-		   type = new class_tree_node_type( name, class_);
+		   type = new class_tree_node_type( name);
 		   class_table->addid( name, type);
-
-		   if ( father_type)
-		   {
-			   type->set_father( father_type);
-		   }
 	   }
 
+	   if ( class_)
+	   {
+		   if ( type->is_defined())
+		   {
+			   cls_table->semant_error()
+				   << "BUG: overriding old Class "
+				   << name << endl;
+		   }
+		   type->set_contain( class_);
+	   }
+
+	   if ( father_type)
+	   {
+		   type->set_father( father_type);
+	   }
 	   return type;
 }
 
@@ -162,7 +172,7 @@ Type::Type( class_tree_node n) : node( n ? n : Null_type.node) {}
 
 Type::operator bool() const
 {
-	return node->is_defined();
+	return node && node != Null_type.node && node->is_defined();
 }
 
 bool operator==( const Type &a, class_tree_node b)
@@ -379,8 +389,12 @@ void ClassTable::install_basic_classes() {
 						      Str,
 						      no_expr()))),
 	       filename);
-    Class_ Self_class = class_( SELF_TYPE, Object, nil_Features(), filename);
+
     Class_ No_class = class_( No_type, Object, nil_Features(), filename);
+    Class_ Self_class = class_( SELF_TYPE, Object, nil_Features(), filename);
+
+    ::Null_type = lookup_install_type( No_type, No_class);
+    ::Self_type = lookup_install_type( SELF_TYPE, Self_class);
 
     ::Object_type = lookup_install_type( Object, Object_class);
 
@@ -388,8 +402,6 @@ void ClassTable::install_basic_classes() {
     ::Int_type = lookup_install_type( Int, Int_class, Object_type);
     ::Bool_type = lookup_install_type( Bool, Bool_class, Object_type);
     ::Str_type = lookup_install_type( Str, Str_class, Object_type);
-    ::Self_type = lookup_install_type( SELF_TYPE, Self_class);
-    ::Null_type = lookup_install_type( No_type, No_class);
 
     lookup_install_type( prim_slot, No_class);
 }
@@ -638,8 +650,9 @@ bool method_class::check_Feature_Types()
 	}
 	else
 	{
-		semant_error( filename, this) << "Return type of " << this->name <<
-			" is not defined." << endl;
+		semant_error( filename, this) << "In Class " << Current_type->name
+		       << ", return type of method " << this->name
+		       << ", Class " << type->name << " is not defined." << endl;
 	}
 
 	// Well, we do not check body type.
@@ -725,6 +738,12 @@ Type branch_class::check_Case_Type( Type path_type)
 
 Type assign_class::do_Check_Expr_Type()
 {
+	/*
+	cout << "Variable table:";
+	var_table->dump();
+	cout << endl;
+	*/
+
 	Type n1 = var_table->lookup( name);
 	Type n2 = expr->get_Expr_Type();
 	if ( !n1)
@@ -748,6 +767,16 @@ Type assign_class::do_Check_Expr_Type()
 Type check_dispatch( Type caller, Type real_caller, Symbol name, Expressions actual, Expression e)
 {
 	class_method types = real_caller->find_method( name);
+	if ( !types)
+	{
+		semant_error( filename, e)
+			<< "Calls on method " << name << " on Class "
+			<< real_caller->name << " failed." << endl;
+		semant_error( filename, e)
+			<< "\t" << "Could not find method." << endl;
+		return Null_type;
+	}
+
 	Type ret_type = types->hd();
 	ret_type = ret_type == Self_type ? caller : ret_type;
 
@@ -781,7 +810,7 @@ Type check_dispatch( Type caller, Type real_caller, Symbol name, Expressions act
 		{
 			if ( types)
 			{
-				err_str = "Arguments mis match.";
+				err_str = "Arguments miss match.";
 			}
 			else
 			{
@@ -791,8 +820,9 @@ Type check_dispatch( Type caller, Type real_caller, Symbol name, Expressions act
 
 		semant_error( filename, e)
 			<< "Calls on method " << name << " on Class "
-			<< real_caller->name << " failed."
-			<< endl << "\t" << err_str << endl;
+			<< real_caller->name << " failed." << endl;
+		semant_error( filename, e)
+			<< "\t" << err_str << endl;
 	}
 
 	return ret_type;
@@ -1072,13 +1102,13 @@ Type isvoid_class::do_Check_Expr_Type()
 Type no_expr_class::do_Check_Expr_Type()
 {
 	// This would only be called when checking object method.
-	return Object_type;
+	return Null_type;
 }
 
 Type object_class::do_Check_Expr_Type()
 {
 	Type ret = var_table->lookup( name);
-	if ( ret)
+	if ( !ret)
 	{
 		semant_error( filename, this) << "Variable " << name << " not defined." << endl;
 	}

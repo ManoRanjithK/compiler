@@ -79,16 +79,16 @@ struct class_tree_node_type {
 	class_tree_node_type( Symbol name, Class_ class_ = NULL) :
 		set_head( this), set_rank( 0), set_size( 1),
 		father( NULL), son( NULL), sibling( NULL),
-		contain( class_), depth( -1), name( name)
+		contain( class_), depth( -1), name( name),
+		all_node_next( all_node_head)
 	{
+		all_node_head = this;
+
 		method_table.enterscope();
 		if ( class_)
 		{
 			this->set_contain(class_);
 		}
-
-		all_node_next = all_node_head;
-		all_node_head = this;
 	}
 
 	~class_tree_node_type()
@@ -133,7 +133,7 @@ struct class_tree_node_type {
 	class_method find_method( Symbol name)
 	{
 		class_method ret = method_table.lookup( name);
-		return ret ? ret : ( father != this ? father->find_method( name) : NULL);
+		return ret ? ret : ( father ? father->find_method( name) : NULL);
 	}
 
 	friend class_tree_node find_lca( class_tree_node, class_tree_node);
