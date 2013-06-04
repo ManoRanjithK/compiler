@@ -851,6 +851,8 @@ Type check_dispatch( Type caller, Type real_caller, Symbol name, Expressions act
 		Type act_type = expr->get_Expr_Type();
 		Type para_type = types->hd();
 
+		act_type = act_type == Self_type ? Current_type : act_type;
+
 		if ( act_type && para_type &&
 				act_type->is_subtype_of( para_type))
 		{
@@ -1147,7 +1149,6 @@ Type string_const_class::do_Check_Expr_Type()
 Type new__class::do_Check_Expr_Type()
 {
 	Type type = class_table->lookup( type_name);
-	type = type == Self_type ? Current_type : type;
 
 	if ( !type)
 	{
