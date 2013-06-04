@@ -13,7 +13,35 @@
 #include "cool-tree.handcode.h"
 
 struct class_tree_node_type;
-class Type;
+typedef class_tree_node_type *class_tree_node;
+class Type
+{
+	private:
+	class_tree_node node;
+
+	public:
+	Type( class_tree_node n = NULL);
+	Type( const Type &tn)
+	{
+		node = tn.node;
+	}
+
+	operator bool() const;
+
+	class_tree_node operator->() const
+	{
+		return node;
+	}
+
+	operator class_tree_node() const
+	{
+		return node;
+	}
+
+	friend bool operator==( const Type &a, const Type &b);
+	friend bool operator==( const Type &a, class_tree_node b);
+	friend bool operator==( class_tree_node a, const Type &b);
+};
 
 // define the class for phylum
 // define simple phylum - Program

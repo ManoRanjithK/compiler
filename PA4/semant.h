@@ -27,49 +27,6 @@ typedef class_tree_node_type *class_tree_node;
 struct class_method_type;
 typedef class_method_type *class_method;
 
-class Type
-{
-	private:
-	class_tree_node node;
-
-	public:
-	Type( class_tree_node n = NULL);
-	Type( Type tn)
-	{
-		node = tn.node;
-	}
-
-	bool operator bool() const
-	{
-		return node->is_defined();
-	}
-
-	bool operator->() const
-	{
-		return node;
-	}
-
-	friend class_tree_node &operator=( class_tree_node &p, const Type &);
-};
-
-struct class_method_type
-{
-	private:
-	Type type;
-	class_method next;
-
-	public:
-	class_method_type( Type nt, class_method nn = NULL) : type( nt), next( nn) {}
-
-	Type hd() const { return type;}
-	class_method tl() const { return next;}
-
-	void set_hd( Type nt) { type = nt;}
-	void set_tl( class_method nn) { next = nn;}
-
-	bool is_defined() const { return type; }
-};
-
 typedef SymbolTable< Symbol, class_tree_node_type> symtable_type;
 typedef SymbolTable< Symbol, class_method_type> method_table_type;
 
@@ -171,15 +128,7 @@ struct class_tree_node_type {
 		return leg == super;
 	}
 
-	bool is_defined() const
-	{
-		return contain && contain != Null_type;
-	}
-
-	bool operator bool() const
-	{
-		return is_defined();
-	}
+	bool is_defined() const;
 
 	class_method find_method( Symbol name)
 	{
@@ -217,6 +166,24 @@ struct class_tree_node_type {
 	}
 
 	bool walk_down();
+};
+
+struct class_method_type
+{
+	private:
+	Type type;
+	class_method next;
+
+	public:
+	class_method_type( Type nt, class_method nn = NULL) : type( nt), next( nn) {}
+
+	Type hd() const { return type;}
+	class_method tl() const { return next;}
+
+	void set_hd( Type nt) { type = nt;}
+	void set_tl( class_method nn) { next = nn;}
+
+	bool is_defined() const { return type; }
 };
 
 #endif

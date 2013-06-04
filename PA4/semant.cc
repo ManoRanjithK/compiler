@@ -86,15 +86,15 @@ static void initialize_constants(void)
     val         = idtable.add_string("_val");
 }
 
-Type lookup_install_type( Symbol name, Class_ class_ = NULL, Type father_type = Null_type)
+Type lookup_install_type( Symbol name, Class_ class_ = NULL, Type father_type = NULL)
 {
 	   Type type = class_table->lookup( name);
-	   if ( type == NULL)
+	   if ( type)
 	   {
 		   type = new class_tree_node_type( name, class_);
 		   class_table->addid( name, type);
 
-		   if ( father_type != Null_type)
+		   if ( father_type)
 		   {
 			   type->set_father( father_type);
 		   }
@@ -126,7 +126,7 @@ class_tree_node find_lca( class_tree_node x, class_tree_node y)
 		y = y->father;
 	}
 
-	return x ? y : Null_type;
+	return x ? y : NULL;
 }
 
 class_tree_node union_set( class_tree_node first, class_tree_node second)
@@ -158,26 +158,51 @@ Type Self_type = NULL;
 Type Current_type = NULL;
 Symbol filename;
 
-Type::Type( class_tree_node n = NULL) : node( n ? Null_type->()) {}
+Type::Type( class_tree_node n) : node( n ? n : Null_type.node) {}
+
+Type::operator bool() const
+{
+	return node->is_defined();
+}
+
+bool operator==( const Type &a, class_tree_node b)
+{
+	return a.node == b;
+}
+
+bool operator!=( const Type &a, class_tree_node b)
+{
+	return !(a == b);
+}
+
+bool operator==( class_tree_node a, const Type &b)
+{
+	return a == b.node;
+}
+
+bool operator!=( class_tree_node a, const Type &b)
+{
+	return !(a == b);
+}
+
+bool operator==( const Type &a, const Type &b)
+{
+	return a.node == b.node;
+}
+
+bool operator!=( const Type &a, const Type &b)
+{
+	return !(a == b);
+}
 
 bool operator==( const Expression &e, const Type &t)
 {
-	return e->get_Expr_Type == t;
+	return e->get_Expr_Type() == t;
 }
 
 bool operator!=( const Expression &e, const Type &t)
 {
 	return !(e == t);
-}
-
-const Type &operator=( const Type &t, const Expression &e)
-{
-	return t = e->get_Expr_Type();
-}
-
-class_tree_node &operator=( class_tree_node &p, const Type &t)
-{
-	return p = t.node;
 }
 
 ClassTable::ClassTable(Classes classes) : semant_errors(0) , error_stream(cerr) {
@@ -418,17 +443,21 @@ ostream& semant_error(Symbol filename, tree_node *t)
     return cls_table->semant_error( filename, t);
 }
 
-ostream& ClassTable::semant_error()
+ostream& semant_error()
 {
     return cls_table->semant_error();
 }
 
-static class_tree_node class_tree_node_type::all_node_head = NULL;
+class_tree_node class_tree_node_type::all_node_head = NULL;
+bool class_tree_node_type::is_defined() const
+{
+	return contain && this != Null_type;
+}
 
 bool class_tree_node_type::walk_down()
 {
 	::Current_type = this;
-	::filename = get_filename();
+	::filename = contain->get_filename();
 
 	/*
 	cout << "Checking Class " << this->defined()->contain->get_name() << endl;
@@ -752,7 +781,7 @@ Type check_dispatch( Type caller, Type real_caller, Symbol name, Expressions act
 		{
 			if ( types)
 			{
-				err_str = "Arguments mis match."
+				err_str = "Arguments mis match.";
 			}
 			else
 			{
@@ -817,7 +846,7 @@ Type cond_class::do_Check_Expr_Type()
 	Type else_type = else_exp->get_Expr_Type();
 	return pred->get_Expr_Type() == Bool_type &&
 		then_type && else_type
-		? find_lca( then_type, else_type) : Null_type;
+		? Type( find_lca( then_type, else_type)) : Null_type;
 }
 
 Type loop_class::do_Check_Expr_Type()
