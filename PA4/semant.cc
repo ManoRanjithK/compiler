@@ -86,30 +86,21 @@ static void initialize_constants(void)
     val         = idtable.add_string("_val");
 }
 
-Type lookup_install_type( Symbol name)
+Type lookup_install_type( Symbol name, Class_ class_ = NULL, Type father_type = Null_type)
 {
 	   Type type = class_table->lookup( name);
 	   if ( type == NULL)
 	   {
-		   type = new class_tree_node_type( NULL);
+		   type = new class_tree_node_type( name, class_);
 		   class_table->addid( name, type);
+
+		   if ( father_type != Null_type)
+		   {
+			   type->set_father( father_type);
+		   }
 	   }
 
 	   return type;
-}
-
-Type lookup_install_type( Symbol name, Class_ class_)
-{
-	Type type = lookup_install_type( name);
-	type->set_contain( class_);
-	return type;
-}
-
-Type lookup_install_type( Symbol name, Class_ class_, Type father_type)
-{
-	Type type = lookup_install_type( name, class_);
-	type->set_father( father_type);
-	return type;
 }
 
 class_tree_node find_lca( class_tree_node x, class_tree_node y)
@@ -245,6 +236,8 @@ ClassTable::ClassTable(Classes classes) : semant_errors(0) , error_stream(cerr) 
 		}
 		++cnt;
 	}
+
+	root->fill_info();
 
 	if ( !root->walk_down())
 	{
