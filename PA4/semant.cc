@@ -688,16 +688,26 @@ bool attr_class::install_Feature_Types()
 {
 	feature_type = lookup_install_type( type_decl);
 
-	bool ret = !var_table->probe( name);
-	if ( ret)
-	{
-		var_table->addid( name, feature_type);
-	}
-	else
+	bool ret = false;
+	if ( var_table->probe( name))
 	{
 		semant_error( filename, this)
 			<< " Attribute " << name << " has been defined."
 			<< endl;
+	}
+	else
+	{
+		if ( var_table->lookup( name))
+		{
+			semant_error( filename, this)
+				<< " Attribute " << name << " is an attribute of inherited class."
+				<< endl;
+		}
+		else
+		{
+			var_table->addid( name, feature_type);
+			ret = true;
+		}
 	}
 
 	return ret;
