@@ -498,7 +498,7 @@ Type Expression_class::get_Expr_Type()
 		expr_type = do_Check_Expr_Type();
 		if ( expr_type)
 		{
-			set_type( expr_type->contain->get_name());
+			set_type( expr_type->name);
 		}
 		else
 		{
@@ -704,8 +704,8 @@ Type assign_class::do_Check_Expr_Type()
 	{
 		if ( n2 && !n2->is_subtype_of( n1))
 		{
-			semant_error( filename, this) << "Could not assign Class " << n2->contain->get_name() <<
-				" to " << " Class " << n1->contain->get_name() << endl;
+			semant_error( filename, this) << "Could not assign Class " << n2->name <<
+				" to " << " Class " << n1->name << endl;
 			n2 = n1;
 		}
 	}
@@ -759,7 +759,7 @@ Type check_dispatch( Type caller, Type real_caller, Symbol name, Expressions act
 
 		semant_error( filename, e)
 			<< "Calls on method " << name << " on Class "
-			<< real_caller->contain->get_name() << " failed."
+			<< real_caller->name << " failed."
 			<< endl << "\t" << err_str << endl;
 	}
 
@@ -784,10 +784,8 @@ Type static_dispatch_class::do_Check_Expr_Type()
 			if ( caller)
 			{
 				semant_error( filename, this)
-					<< "Could not convert Class "
-					<< caller->contain->get_name()
-					<< " to Class "
-					<< type_name << endl;
+					<< "Could not convert Class " << caller->name
+					<< " to Class " << type_name << endl;
 			}
 		}
 		return Null_type;
@@ -909,7 +907,7 @@ Type let_class::do_Check_Expr_Type()
 		semant_error( filename, this)
 			<< "Could not initialize " << identifier
 			<< " of Class " << type_decl << " with Class "
-			<< expr_type->contain->get_name() << endl;
+			<< expr_type->name << endl;
 	}
 
 	return ret;
