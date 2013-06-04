@@ -762,7 +762,15 @@ bool formal_class::check_Formal_Type()
 	{
 		semant_error( filename, this) << "Formal name " << this->name << " has been defined." << endl;
 	}
-	return ext_type && var_table->probe( name) == NULL;
+	if ( name == self)
+	{
+		semant_error( filename, this) << "self could not be a formal name." << endl;
+	}
+	if ( ext_type == Self_type)
+	{
+		semant_error( filename, this) << "SELF_TYPE could not be a formal type." << endl;
+	}
+	return ext_type && ext_type != Self_type && name != self && var_table->probe( name) == NULL;
 }
 
 void formal_class::install_Formal_Type()
