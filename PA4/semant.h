@@ -184,6 +184,8 @@ struct class_method_type
 	void set_tl( class_method nn) { next = nn;}
 
 	bool is_defined() const { return type; }
+
+	bool same_method( class_method t) const;
 };
 
 #endif

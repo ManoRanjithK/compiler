@@ -215,6 +215,16 @@ bool operator!=( const Expression &e, const Type &t)
 	return !(e == t);
 }
 
+bool class_method_type::same_method( class_method t) const
+{
+	if ( !t || t->type != type)
+	{
+		return false;
+	}
+
+	return next ? next->same_method( t->next) : true;
+}
+
 ClassTable::ClassTable(Classes classes) : semant_errors(0) , error_stream(cerr) {
 	cls_table = this;
 	class_table = &symtable;
@@ -291,6 +301,11 @@ ClassTable::ClassTable(Classes classes) : semant_errors(0) , error_stream(cerr) 
 		// Find bug: Not all classes has a root.
 		// Some classes must be undefined.
 		return;
+	}
+
+	if ( !class_table->lookup( Main))
+	{
+		semant_error() << "Class Main is not defined." << endl;
 	}
 
 	class_table->exitscope();
@@ -622,6 +637,18 @@ bool method_class::install_Feature_Types()
 
 bool method_class::check_Feature_Types()
 {
+	if ( Current_type->father)
+	{
+		class_method last = Current_type->father->find_method( name);
+		class_method syms = Current_type->find_method( name);
+		if ( last && !syms->same_method( last))
+		{
+			semant_error( filename, this)
+				<< "Signature changed for method "
+				<< name << endl;
+		}
+	}
+
 	var_table->enterscope();
 	/*
 	class_table->dump();
@@ -969,6 +996,12 @@ Type block_class::do_Check_Expr_Type()
 
 Type let_class::do_Check_Expr_Type()
 {
+	if ( identifier == self)
+	{
+		semant_error( filename, this)
+			<< "Binding self as an identifier." << endl;
+	}
+
 	Type id_type = class_table->lookup( type_decl);
 	id_type = id_type == Self_type ? Current_type : id_type;
 	Type expr_type = init->is_no_expr() ? id_type : init->get_Expr_Type();
