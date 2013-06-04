@@ -106,6 +106,9 @@ struct class_tree_node_type {
 
 	Symbol name;
 
+	static class_tree_node all_node_head;
+	class_tree_node all_node_next;
+
 	method_table_type method_table;
 
 	class_tree_node find_set()
@@ -119,13 +122,16 @@ struct class_tree_node_type {
 	class_tree_node_type( Symbol name, Class_ class_ = NULL) :
 		set_head( this), set_rank( 0), set_size( 1),
 		father( NULL), son( NULL), sibling( NULL),
-		contain( class_), depth( 0), name( name)
+		contain( class_), depth( -1), name( name)
 	{
 		method_table.enterscope();
 		if ( class_)
 		{
 			this->set_contain(class_);
 		}
+
+		all_node_next = all_node_head;
+		all_node_head = this;
 	}
 
 	~class_tree_node_type()
@@ -183,19 +189,30 @@ struct class_tree_node_type {
 
 	friend class_tree_node find_lca( class_tree_node, class_tree_node);
 
-	void fill_info()
+	void fill_depth()
 	{
-		if ( father)
+		if ( depth == -1)
 		{
-			depth = father->depth + 1;
+			if ( father)
+			{
+				father->fill_depth();
+				depth = father->depth + 1;
+			}
+			else
+			{
+				depth = 0;
+			}
+			find_set();
 		}
-		find_set();
+	}
 
-		class_tree_node leg = son;
+	static void fill_node_depth()
+	{
+		class_tree_node leg = all_node_head;
 		while ( leg)
 		{
-			leg->fill_info();
-			leg = leg->sibling;
+			leg->fill_depth();
+			leg = leg->all_node_next;
 		}
 	}
 

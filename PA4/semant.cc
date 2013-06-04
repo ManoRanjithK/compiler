@@ -237,7 +237,7 @@ ClassTable::ClassTable(Classes classes) : semant_errors(0) , error_stream(cerr) 
 		++cnt;
 	}
 
-	root->fill_info();
+	class_tree_node_type::fill_node_depth();
 
 	if ( !root->walk_down())
 	{
@@ -421,6 +421,8 @@ ostream& ClassTable::semant_error()
 {
     return cls_table->semant_error();
 }
+
+static class_tree_node class_tree_node_type::all_node_head = NULL;
 
 bool class_tree_node_type::walk_down()
 {
