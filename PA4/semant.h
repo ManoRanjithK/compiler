@@ -112,7 +112,7 @@ struct class_tree_node_type {
 		return contain->collect_Methods();
 	}
 
-	bool is_subtype_of( const class_tree_node_type *super) const
+	bool is_sub_class_of( const class_tree_node_type *super) const
 	{
 		if ( !is_defined() || !super->is_defined())
 		{
@@ -136,7 +136,7 @@ struct class_tree_node_type {
 		return ret ? ret : ( father ? father->find_method( name) : NULL);
 	}
 
-	friend class_tree_node find_lca( class_tree_node, class_tree_node);
+	friend class_tree_node find_class_lca( class_tree_node, class_tree_node);
 
 	bool fill_depth();
 

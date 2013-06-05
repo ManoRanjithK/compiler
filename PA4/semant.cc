@@ -113,7 +113,7 @@ Type lookup_install_type( Symbol name, Class_ class_ = NULL, Type father_type = 
 	   return type;
 }
 
-class_tree_node find_lca( class_tree_node x, class_tree_node y)
+class_tree_node find_class_lca( class_tree_node x, class_tree_node y)
 {
 	if ( !x || !y)
 	{
@@ -213,6 +213,22 @@ bool operator==( const Expression &e, const Type &t)
 bool operator!=( const Expression &e, const Type &t)
 {
 	return !(e == t);
+}
+
+bool operator<=( const Type &a, const Type &b)
+{
+	if ( b == Self_type)
+	{
+		return a == Self_type;
+	}
+	return ( a == Self_type ? Current_type : a)->is_sub_class_of( b);
+}
+
+Type find_type_lca( const Type &a, const Type &b)
+{
+	Type xa = a == Self_type ? Current_type : a;
+	Type xb = b == Self_type ? Current_type : b;
+	return find_class_lca( xa, xb);
 }
 
 bool class_method_type::same_method( class_method t) const
@@ -693,6 +709,12 @@ bool method_class::check_Feature_Types()
 		{
 			body_type = type;
 		}
+		if ( !body_type.is_sub_type_of( type))
+		{
+			semant_error( filename, this) << "In Class " << Current_type->name
+				<< ", return type of method " << this->name
+				<< ", Class " << type->name << " could not be satisfied." << endl;
+		}
 	}
 	else
 	{
@@ -701,8 +723,7 @@ bool method_class::check_Feature_Types()
 		       << ", Class " << type->name << " is not defined." << endl;
 	}
 
-	// Well, we do not check body type.
-	return type && body_type; //&& body_type->is_subtype_of( type);
+	return type && body_type && body_type.is_sub_type_of( type);
 }
 
 void attr_class::collect_Feature_Types()
@@ -720,7 +741,7 @@ bool attr_class::check_Feature_Types()
 	}
 	else
 	{
-		if ( !t2 || !t2->is_subtype_of( type))
+		if ( !t2 || !t2.is_sub_type_of( type))
 		{
 			t2 = type;
 		}
@@ -835,7 +856,7 @@ Type assign_class::do_Check_Expr_Type()
 	}
 	else
 	{
-		if ( n2 && !n2->is_subtype_of( n1))
+		if ( n2 && !n2.is_sub_type_of( n1))
 		{
 			semant_error( filename, this) << "Could not assign Class " << n2->name <<
 				" to " << " Class " << n1->name << endl;
@@ -874,7 +895,7 @@ Type check_dispatch( Type caller, Type real_caller, Symbol name, Expressions act
 		act_type = act_type == Self_type ? Current_type : act_type;
 
 		if ( act_type && para_type &&
-				act_type->is_subtype_of( para_type))
+				act_type.is_sub_type_of( para_type))
 		{
 			types = types->tl(), i = actual->next( i);
 		}
@@ -916,7 +937,7 @@ Type static_dispatch_class::do_Check_Expr_Type()
 {
 	Type caller = expr->get_Expr_Type();
 	Type real_caller = class_table->lookup( type_name);
-	if ( !real_caller || !caller || !caller->is_subtype_of( real_caller))
+	if ( !real_caller || !caller || !caller.is_sub_type_of( real_caller))
 	{
 		// What's the fuck with caller.
 		if ( !real_caller)
@@ -960,7 +981,7 @@ Type cond_class::do_Check_Expr_Type()
 	Type else_type = else_exp->get_Expr_Type();
 	return pred->get_Expr_Type() == Bool_type &&
 		then_type && else_type
-		? Type( find_lca( then_type, else_type)) : Null_type;
+		? find_type_lca( then_type, else_type) : Null_type;
 }
 
 Type loop_class::do_Check_Expr_Type()
@@ -993,7 +1014,7 @@ Type typcase_class::do_Check_Expr_Type()
 			{
 				if ( value_type)
 				{
-					value_type = find_lca( value_type, br_type);
+					value_type = find_type_lca( value_type, br_type);
 				}
 				else
 				{
@@ -1030,11 +1051,10 @@ Type let_class::do_Check_Expr_Type()
 	}
 
 	Type id_type = class_table->lookup( type_decl);
-	id_type = id_type == Self_type ? Current_type : id_type;
 	Type expr_type = init->is_no_expr() ? id_type : init->get_Expr_Type();
 
 	Type ret = Null_type;
-	if ( id_type && expr_type && expr_type->is_subtype_of( id_type))
+	if ( id_type && expr_type && expr_type.is_sub_type_of( id_type))
 	{
 		var_table->enterscope();
 		var_table->addid( identifier, id_type);
@@ -1054,7 +1074,7 @@ Type let_class::do_Check_Expr_Type()
 			<< "Could not find Class " << type_decl << endl;
 	}
 
-	if ( id_type && expr_type && !expr_type->is_subtype_of( id_type))
+	if ( id_type && expr_type && !expr_type.is_sub_type_of( id_type))
 	{
 		semant_error( filename, this)
 			<< "Could not initialize " << identifier

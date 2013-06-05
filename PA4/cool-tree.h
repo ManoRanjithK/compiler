@@ -41,6 +41,15 @@ class Type
 	friend bool operator==( const Type &a, const Type &b);
 	friend bool operator==( const Type &a, class_tree_node b);
 	friend bool operator==( class_tree_node a, const Type &b);
+
+	friend bool operator<=( const Type &, const Type &);
+
+	friend Type find_type_lca( const Type &, const Type &);
+
+	bool is_sub_type_of( const Type &o)
+	{
+		return *this <= o;
+	}
 };
 
 // define the class for phylum
