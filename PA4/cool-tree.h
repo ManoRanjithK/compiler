@@ -157,6 +157,7 @@ public:
    tree_node *copy()		 { return copy_Case(); }
    virtual Case copy_Case() = 0;
 
+   virtual bool install_Case_Type() = 0;
    virtual Type check_Case_Type( Type path_type) = 0;
 
 #ifdef Case_EXTRAS
@@ -338,6 +339,7 @@ public:
 
 // define constructor - branch
 class branch_class : public Case_class {
+   Type id_type;
 protected:
    Symbol name;
    Symbol type_decl;
@@ -351,6 +353,7 @@ public:
    Case copy_Case();
    void dump(ostream& stream, int n);
 
+   bool install_Case_Type();
    Type check_Case_Type( Type path_type);
 
 #ifdef Case_SHARED_EXTRAS

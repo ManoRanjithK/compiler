@@ -811,9 +811,28 @@ void formal_class::install_Formal_Type()
 	var_table->addid( name, ext_type);
 }
 
+bool branch_class::install_Case_Type()
+{
+	id_type = class_table->lookup( type_decl);
+	if ( class_table->probe( type_decl))
+	{
+		semant_error( filename, this)
+			<< "Indentical branch Class " << name
+			<< " in same case" << endl;
+	}
+	else
+	{
+		if ( id_type)
+		{
+			class_table->addid( type_decl, id_type);
+		}
+	}
+
+	return true;
+}
+
 Type branch_class::check_Case_Type( Type path_type)
 {
-	Type id_type = class_table->lookup( type_decl);
 	Type ret = Null_type;
 
 	if ( !id_type)
@@ -1002,10 +1021,14 @@ Type typcase_class::do_Check_Expr_Type()
 	Type value_type = Null_type;
 	if ( path_type)
 	{
+		class_table->enterscope();
 		for ( int i = cases->first(); cases->more( i); i = cases->next( i))
 		{
 			Case br = cases->nth( i);
+
+			br->install_Case_Type();
 			Type br_type = br->check_Case_Type( path_type);
+
 			if ( !br_type)
 			{
 				value_type = Null_type;
@@ -1027,6 +1050,7 @@ Type typcase_class::do_Check_Expr_Type()
 				break;
 			}
 		}
+		class_table->exitscope();
 	}
 
 	return value_type;
