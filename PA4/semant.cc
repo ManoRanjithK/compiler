@@ -743,6 +743,14 @@ bool attr_class::check_Feature_Types()
 	{
 		if ( !t2 || !t2.is_sub_type_of( type))
 		{
+			if ( t2)
+			{
+				semant_error( filename, this)
+					<< "In Class " << Current_type->name
+					<< ", could not initialize attribute " << name
+					<< " of Class " << type_decl << " with Class "
+					<< t2->name << endl;
+			}
 			t2 = type;
 		}
 	}
@@ -1101,7 +1109,7 @@ Type let_class::do_Check_Expr_Type()
 	if ( id_type && expr_type && !expr_type.is_sub_type_of( id_type))
 	{
 		semant_error( filename, this)
-			<< "Could not initialize " << identifier
+			<< "Could not initialize variable " << identifier
 			<< " of Class " << type_decl << " with Class "
 			<< expr_type->name << endl;
 	}
