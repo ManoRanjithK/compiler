@@ -31,8 +31,10 @@ private:
    void code_bools(int);
    void code_select_gc();
    void code_constants();
-   void code_disptabs();
+
    void code_prototypes();
+   void code_classnametab()
+   void code_disptabs();
 
 // The following creates an inheritance graph from
 // a list of classes.  The graph is implemented as
@@ -66,6 +68,8 @@ private:
    int class_tag;
    static int class_count;
 
+   StringEntry class_name_entry;
+
 public:
    CgenNode(Class_ c,
             Basicness bstatus,
@@ -78,7 +82,10 @@ public:
    int basic() { return (basic_status == Basic); }
 
    void code_prototype( ostream &str);
+   void code_classnameentry( ostream &str)
    void walk_down_code_disptab( ostream &str);
+
+   static void set_class_count( int count) { CgenNode::class_count = count;}
 };
 
 class BoolConst

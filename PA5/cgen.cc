@@ -624,16 +624,32 @@ void CgenClassTable::code_prototypes()
 	}
 }
 
+void CgenClassTable::code_classnametab()
+{
+	str << CLASSNAMETAB << LABLE;
+	for(List<CgenNode> *l = nds; l; l = l->tl())
+	{
+		l->hd()->code_classnameentry( str);
+	}
+}
+
+void CgenClassTable::code_disptabs()
+{
+	root()->walk_down_code_disptab( str);
+}
+
 CgenClassTable::CgenClassTable(Classes classes, ostream& s) : nds(NULL) , str(s)
 {
-   stringclasstag = 7 /* Change to your String class tag here */;
-   intclasstag =    5 /* Change to your Int class tag here */;
-   boolclasstag =   6 /* Change to your Bool class tag here */;
-
    enterscope();
    if (cgen_debug) cout << "Building CgenClassTable" << endl;
    install_basic_classes();
+
+   stringclasstag = lookup( Str)->class_tag;
+   intclasstag = lookup( Int)->class_tag;
+   boolclasstag = lookup( Bool)->class_tag;
+
    install_classes(classes);
+
    build_inheritance_tree();
 
    code();
@@ -655,6 +671,8 @@ void CgenClassTable::install_basic_classes()
 // SELF_TYPE is the self class; it cannot be redefined or inherited.
 // prim_slot is a class known to the code generator.
 //
+  CgenNode::set_class_count( -3);
+
   addid(No_class,
 	new CgenNode(class_(No_class,No_class,nil_Features(),filename),
 			    Basic,this));
@@ -896,6 +914,11 @@ void CgenNode::set_parentnd(CgenNodeP p)
   parentnd = p;
 }
 
+void CgenNode::code_classnameentry( ostream &str)
+{
+	str << WORD; class_name_entry->code_ref( str);
+}
+
 void CgenNode::code_prototype( ostream &str)
 {
 	// Basic classes are coded into constants section.
@@ -996,7 +1019,7 @@ CgenNode::CgenNode(Class_ nd, Basicness bstatus, CgenClassTableP ct) :
 {
    class_tag = class_count++;
    object_size = dispatch_table_size = 0;
-   stringtable.add_string(name->get_string());          // Add class name to string table
+   class_name_entry = stringtable.add_string(name->get_string());          // Add class name to string table
 }
 
 
