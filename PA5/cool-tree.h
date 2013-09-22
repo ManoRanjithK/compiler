@@ -50,6 +50,8 @@ public:
    tree_node *copy()		 { return copy_Feature(); }
    virtual Feature copy_Feature() = 0;
 
+   virtual int is_method() const = 0;
+   virtual Symbol get_name() const = 0;
 #ifdef Feature_EXTRAS
    Feature_EXTRAS
 #endif
@@ -188,6 +190,9 @@ public:
    Feature copy_Feature();
    void dump(ostream& stream, int n);
 
+   int is_method() const { return 1;}
+   Symbol get_name() const { return name;}
+
 #ifdef Feature_SHARED_EXTRAS
    Feature_SHARED_EXTRAS
 #endif
@@ -211,6 +216,9 @@ public:
    }
    Feature copy_Feature();
    void dump(ostream& stream, int n);
+
+   int is_method() const { return 0;}
+   Symbol get_name() const { return name;}
 
 #ifdef Feature_SHARED_EXTRAS
    Feature_SHARED_EXTRAS

@@ -31,6 +31,7 @@ private:
    void code_bools(int);
    void code_select_gc();
    void code_constants();
+   void code_prototypes();
 
 // The following creates an inheritance graph from
 // a list of classes.  The graph is implemented as
@@ -49,12 +50,18 @@ public:
 };
 
 
+Symtable< Symbol, Entry> method_table;
+
 class CgenNode : public class__class {
-private: 
+private:
    CgenNodeP parentnd;                        // Parent of class
    List<CgenNode> *children;                  // Children of class
    Basicness basic_status;                    // `Basic' if class is basic
                                               // `NotBasic' otherwise
+   int object_size;
+   class_method_list *method_list;
+   int dispatch_table_size;
+
 
 public:
    CgenNode(Class_ c,
@@ -66,15 +73,34 @@ public:
    void set_parentnd(CgenNodeP p);
    CgenNodeP get_parentnd() { return parentnd; }
    int basic() { return (basic_status == Basic); }
+
+   void walk_down();
+   void code_prototype();
 };
 
-class BoolConst 
+class BoolConst
 {
- private: 
+ private:
   int val;
  public:
   BoolConst(int);
   void code_def(ostream&, int boolclasstag);
   void code_ref(ostream&) const;
+};
+
+struct class_method_list
+{
+	private:
+	Symbol name;
+	class_method_list *next;
+
+	public:
+	class_method_type( Type nt, class_method_list *nn = NULL) : type( nt), next( nn) {}
+
+	Symbol hd() const { return name;}
+	class_method_list *tl() const { return next;}
+
+	void set_hd( Symbol nt) { name = nt;}
+	void set_tl( class_method_list nn) { next = nn;}
 };
 
