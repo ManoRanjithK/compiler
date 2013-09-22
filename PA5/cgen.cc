@@ -618,26 +618,23 @@ void CgenClassTable::code_constants()
 
 void CgenClassTable::code_prototypes()
 {
-  for(List<CgenNode> *l = nds; l; l = l->tl())
-  {
-	  l->hd()->code_prototype();
-  }
+	for(List<CgenNode> *l = nds; l; l = l->tl())
+	{
+		l->hd()->code_prototype( str);
+	}
 }
-
 
 CgenClassTable::CgenClassTable(Classes classes, ostream& s) : nds(NULL) , str(s)
 {
-   stringclasstag = 0 /* Change to your String class tag here */;
-   intclasstag =    0 /* Change to your Int class tag here */;
-   boolclasstag =   0 /* Change to your Bool class tag here */;
+   stringclasstag = 7 /* Change to your String class tag here */;
+   intclasstag =    5 /* Change to your Int class tag here */;
+   boolclasstag =   6 /* Change to your Bool class tag here */;
 
    enterscope();
    if (cgen_debug) cout << "Building CgenClassTable" << endl;
    install_basic_classes();
    install_classes(classes);
    build_inheritance_tree();
-
-   root()->walk_down();
 
    code();
    exitscope();
@@ -813,6 +810,8 @@ void CgenClassTable::set_relations(CgenNodeP nd)
   parent_node->add_child(nd);
 }
 
+int CgenNode::class_count = 0;
+
 void CgenNode::count_Features()
 {
 	for ( int i = features->first(); features->more( i); i = features->next( i))
@@ -823,7 +822,7 @@ void CgenNode::count_Features()
 
 			++dispatch_table_size;
 			method_list = new class_method_list( name, method_list);
-			method_table->addid( name, get_name());
+			::method_table->addid( name, get_name());
 		}
 		else
 		{
@@ -832,9 +831,9 @@ void CgenNode::count_Features()
 	}
 }
 
-void CgenNode::walk_down()
+void CgenNode::walk_down_code_disptab( ostream &str)
 {
-	method_table->enterscope();
+	::method_table->enterscope();
 	count_Features();
 	if ( get_name() != Object)
 	{
@@ -847,12 +846,12 @@ void CgenNode::walk_down()
 		while ( methods)
 		{
 			Symbol method_id = methods->hd();
-			if ( !method_table->probe( method_id))
+			if ( !::method_table->probe( method_id))
 			{
 				SymtabEntry< Symbol, Entry> *inhe_method
-					= method_table->lookup( method_id);
+					= ::method_table->lookup( method_id);
 
-				method_table->addid( method_id, inhe_method->get_info());
+				::method_table->addid( method_id, inhe_method->get_info());
 
 				++dispatch_table_size;
 
@@ -865,10 +864,24 @@ void CgenNode::walk_down()
 		// delete inhe_method_list;
 	}
 
+	emit_disptable_ref( get_name(), str); str << LABEL;
+
+	class_method_list methods = method_list;
+	while ( methods)
+	{
+		Symbol method_id = methods->hd();
+		Symbol class_id = ::method_table->lookup( method_id);
+
+		str << WORD; emit_method_ref( class_id, method_id, str);
+
+		methods = methods->tl();
+	}
+
 	for ( List<CgenNode> *leg = children; leg; leg = leg->tl())
 	{
-		leg->hd()->walk_down();
+		leg->hd()->walk_down_code_disptab( str);
 	}
+	::method_table->exitscope();
 }
 
 void CgenNode::add_child(CgenNodeP n)
@@ -883,11 +896,48 @@ void CgenNode::set_parentnd(CgenNodeP p)
   parentnd = p;
 }
 
-void CgenNode::code_prototype()
+void CgenNode::code_prototype( ostream &str)
 {
-	if ( basic())
+	// Basic classes are coded into constants section.
+	if ( basic() == Basic)
 	{
 		return;
+	}
+
+	str << WORD << "-1" << endl;
+	emit_protobj_ref( get_name(), str); str << LABEL
+		<< WORD << class_tag << endl
+		<< WORD << ( DEFAULT_OBJFIELDS + object_size) << endl;
+	emit_disptable_ref( get_name(), str);
+
+	for ( List< CgenNode> *leg = children; leg; leg = leg->tl())
+	{
+		char *prefix = "";
+		if ( leg->hd()->basic() == Basic)
+		{
+			switch ( leg->hd()->class_tag)
+			{
+				case 2:
+					// IO member.
+					break;
+				case 5:
+					// Int member.
+					prefix = INTCONST_PREFIX;
+					break;
+				case 6:
+					// Bool member.
+					prefix = BOOLCONST_PREFIX;
+					break;
+				case 7:
+					// String member.
+					prefix = STRCONST_PREFIX;
+					break;
+				default:
+					if ( cgen_debug)
+					cout << "BUG: a Basic class is not int, bool or string." << endl;
+			}
+		}
+		str << WORD << prefix << "0" << endl;
 	}
 }
 
@@ -909,6 +959,11 @@ void CgenClassTable::code()
 
   if (cgen_debug) cout << "coding prototypes" << endl;
   code_prototypes();
+
+  code_classnametab();
+
+  if (cgen_debug) cout << "coding dispatch tables" << endl;
+  code_disptabs();
 
   if (cgen_debug) cout << "coding global text" << endl;
   code_global_text();
@@ -939,6 +994,7 @@ CgenNode::CgenNode(Class_ nd, Basicness bstatus, CgenClassTableP ct) :
    children(NULL),
    basic_status(bstatus)
 {
+   class_tag = class_count++;
    object_size = dispatch_table_size = 0;
    stringtable.add_string(name->get_string());          // Add class name to string table
 }

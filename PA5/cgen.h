@@ -31,6 +31,7 @@ private:
    void code_bools(int);
    void code_select_gc();
    void code_constants();
+   void code_disptabs();
    void code_prototypes();
 
 // The following creates an inheritance graph from
@@ -62,6 +63,8 @@ private:
    class_method_list *method_list;
    int dispatch_table_size;
 
+   int class_tag;
+   static int class_count;
 
 public:
    CgenNode(Class_ c,
@@ -74,8 +77,8 @@ public:
    CgenNodeP get_parentnd() { return parentnd; }
    int basic() { return (basic_status == Basic); }
 
-   void walk_down();
-   void code_prototype();
+   void code_prototype( ostream &str);
+   void walk_down_code_disptab( ostream &str);
 };
 
 class BoolConst
