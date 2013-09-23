@@ -354,6 +354,25 @@ static void emit_gc_check(char *source, ostream &s)
   s << JAL << "_gc_check" << endl;
 }
 
+static void emit_func_call_before( ostream &s)
+{
+	emit_addiu( SP, SP, -12, s);
+	emit_store( FP, 12, SP, s);
+	emit_store( SELF, 8, SP, s);
+	emit_store( RA, 4, SP, s);
+	emit_addiu( FP, SP, 4, s);
+	emit_move( SELF, ACC);
+}
+
+static void emit_func_call_after( ostream &s)
+{
+	emit_move( ACC, SELF);
+	emit_load( RA, 4, SP, s);
+	emit_load( SELF, 8, SP, s);
+	emit_load( FP, 12, SP, s);
+	emit_addiu( SP, SP, 12, s);
+}
+
 
 ///////////////////////////////////////////////////////////////////////////////
 //
@@ -618,25 +637,25 @@ void CgenClassTable::code_constants()
 
 void CgenClassTable::code_prototypes()
 {
-	for(List<CgenNode> *l = ordered_nds; l; l = l->tl())
+	for ( List<CgenNode> *leg = ordered_nds; leg; leg = leg->tl())
 	{
-		l->hd()->code_prototype( str);
+		leg->hd()->code_prototype( str);
 	}
 }
 
 void CgenClassTable::code_classnametab()
 {
 	str << CLASSNAMETAB << LABEL;
-	for(List<CgenNode> *l = ordered_nds; l; l = l->tl())
+	for ( List<CgenNode> *leg = ordered_nds; leg; leg = leg->tl())
 	{
-		l->hd()->code_classnameentry( str);
+		leg->hd()->code_classnameentry( str);
 	}
 }
 
 void CgenClassTable::code_classobjtab()
 {
 	str << CLASSOBJTAB << LABEL;
-	for(List<CgenNode> *l = ordered_nds; l; l = l->tl())
+	for ( List<CgenNode> *leg = ordered_nds; leg; leg = leg->tl())
 	{
 		l->hd()->code_classobjentry( str);
 	}
@@ -645,6 +664,22 @@ void CgenClassTable::code_classobjtab()
 void CgenClassTable::code_disptabs()
 {
 	root()->walk_down_code_disptab( str);
+}
+
+void CgenClassTable::code_initializers()
+{
+	for ( List<CgenNode> *leg = ordered_nds; leg; leg = leg->tl())
+	{
+		leg->hd()->code_initializer();
+	}
+}
+
+void CgenClassTable::code_class_methods()
+{
+	for ( List<CgenNode> *leg = ordered_nds; leg; leg = leg->tl())
+	{
+		leg->hd()->code_class_methods();
+	}
 }
 
 CgenClassTable::CgenClassTable(Classes classes, ostream& s) : nds(NULL) , str(s), ordered_nds(NULL)
@@ -981,6 +1016,39 @@ void CgenNode::code_prototype( ostream &str)
 	}
 }
 
+void CgenNode::code_initializer( ostream &str)
+{
+	emit_init_ref( get_name(), str); str << LABEL;
+
+	if ( get_name() != Object)
+	{
+		emit_func_call_before( str);
+		str << JAL; emit_init_ref( parentnd->get_name(), str);
+		emit_func_call_after( str);
+
+		for ( int i( 0); features->more( i); i = features->next( i))
+		{
+			if ( !features->nth( i)->is_method())
+			{
+				features->nth( i)->code();
+			}
+		}
+	}
+
+	emit_return( str);
+}
+
+void CgenNode::code_class_methods( ostream &str)
+{
+	for ( int i( 0); features->more( i); i = features->next( i))
+	{
+		if ( features->nth( i)->is_method())
+		{
+			features->nth( i)->code();
+		}
+	}
+}
+
 void CgenClassTable::code()
 {
   if (cgen_debug) cout << "coding global data" << endl;
@@ -1017,6 +1085,11 @@ void CgenClassTable::code()
 //                   - the class methods
 //                   - etc...
 
+  if (cgen_debug) cout << "coding initializers" << endl;
+  code_initializers();
+
+  if (cgen_debug) cout << "coding class methods" << endl;
+  code_class_methods();
 }
 
 

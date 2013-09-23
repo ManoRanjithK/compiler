@@ -39,6 +39,9 @@ private:
    void code_classobjtab();
    void code_disptabs();
 
+   void code_initializers();
+   void code_class_methods();
+
 // The following creates an inheritance graph from
 // a list of classes.  The graph is implemented as
 // a tree of `CgenNode', and class names are placed
@@ -93,6 +96,8 @@ public:
    void code_classnameentry( ostream &str);
    void code_classobjentry( ostream &str);
    void walk_down_code_disptab( ostream &str);
+   void code_initializer( ostream &str);
+   void code_class_methods( ostream &str);
 
    static void set_class_count( int count) { CgenNode::class_count = count;}
 };
