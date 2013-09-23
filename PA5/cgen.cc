@@ -626,7 +626,7 @@ void CgenClassTable::code_prototypes()
 
 void CgenClassTable::code_classnametab()
 {
-	str << CLASSNAMETAB << LABLE;
+	str << CLASSNAMETAB << LABEL;
 	for(List<CgenNode> *l = nds; l; l = l->tl())
 	{
 		l->hd()->code_classnameentry( str);
@@ -840,7 +840,7 @@ void CgenNode::count_Features()
 
 			++dispatch_table_size;
 			method_list = new class_method_list( name, method_list);
-			::method_table->addid( name, get_name());
+			::method_table.addid( name, get_name());
 		}
 		else
 		{
@@ -851,7 +851,7 @@ void CgenNode::count_Features()
 
 void CgenNode::walk_down_code_disptab( ostream &str)
 {
-	::method_table->enterscope();
+	::method_table.enterscope();
 	count_Features();
 	if ( get_name() != Object)
 	{
@@ -864,19 +864,18 @@ void CgenNode::walk_down_code_disptab( ostream &str)
 		while ( methods)
 		{
 			Symbol method_id = methods->hd();
-			if ( !::method_table->probe( method_id))
+			if ( !::method_table.probe( method_id))
 			{
-				SymtabEntry< Symbol, Entry> *inhe_method
-					= ::method_table->lookup( method_id);
-
-				::method_table->addid( method_id, inhe_method->get_info());
+				Symbol class_name = ::method_table.lookup( method_id);
 
 				++dispatch_table_size;
+
+				::method_table.addid( method_id, class_name);
 
 				last_inhe_method->set_tl( new class_method_list( method_id, method_list));
 				last_inhe_method = last_inhe_method->tl();
 			}
-			method = method->tl();
+			methods = methods->tl();
 		}
 		method_list = inhe_method_list->tl();
 		// delete inhe_method_list;
@@ -884,11 +883,11 @@ void CgenNode::walk_down_code_disptab( ostream &str)
 
 	emit_disptable_ref( get_name(), str); str << LABEL;
 
-	class_method_list methods = method_list;
+	class_method_list *methods = method_list;
 	while ( methods)
 	{
 		Symbol method_id = methods->hd();
-		Symbol class_id = ::method_table->lookup( method_id);
+		Symbol class_id = ::method_table.lookup( method_id);
 
 		str << WORD; emit_method_ref( class_id, method_id, str);
 
@@ -899,7 +898,7 @@ void CgenNode::walk_down_code_disptab( ostream &str)
 	{
 		leg->hd()->walk_down_code_disptab( str);
 	}
-	::method_table->exitscope();
+	::method_table.exitscope();
 }
 
 void CgenNode::add_child(CgenNodeP n)
@@ -1015,9 +1014,9 @@ CgenNode::CgenNode(Class_ nd, Basicness bstatus, CgenClassTableP ct) :
    class__class((const class__class &) *nd),
    parentnd(NULL),
    children(NULL),
-   basic_status(bstatus)
+   basic_status(bstatus),
+   class_tag( class_count++)
 {
-   class_tag = class_count++;
    object_size = dispatch_table_size = 0;
    class_name_entry = stringtable.add_string(name->get_string());          // Add class name to string table
 }

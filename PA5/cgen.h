@@ -33,7 +33,7 @@ private:
    void code_constants();
 
    void code_prototypes();
-   void code_classnametab()
+   void code_classnametab();
    void code_disptabs();
 
 // The following creates an inheritance graph from
@@ -53,7 +53,9 @@ public:
 };
 
 
-Symtable< Symbol, Entry> method_table;
+SymbolTable< Symbol, Entry> method_table;
+
+struct class_method_list;
 
 class CgenNode : public class__class {
 private:
@@ -65,15 +67,18 @@ private:
    class_method_list *method_list;
    int dispatch_table_size;
 
-   int class_tag;
    static int class_count;
 
-   StringEntry class_name_entry;
+   StringEntry *class_name_entry;
+
+   void count_Features();
 
 public:
    CgenNode(Class_ c,
             Basicness bstatus,
             CgenClassTableP class_table);
+
+   const int class_tag;
 
    void add_child(CgenNodeP child);
    List<CgenNode> *get_children() { return children; }
@@ -82,7 +87,7 @@ public:
    int basic() { return (basic_status == Basic); }
 
    void code_prototype( ostream &str);
-   void code_classnameentry( ostream &str)
+   void code_classnameentry( ostream &str);
    void walk_down_code_disptab( ostream &str);
 
    static void set_class_count( int count) { CgenNode::class_count = count;}
@@ -105,12 +110,12 @@ struct class_method_list
 	class_method_list *next;
 
 	public:
-	class_method_type( Type nt, class_method_list *nn = NULL) : type( nt), next( nn) {}
+	class_method_list( Symbol nt, class_method_list *nn = NULL) : name( nt), next( nn) {}
 
 	Symbol hd() const { return name;}
 	class_method_list *tl() const { return next;}
 
 	void set_hd( Symbol nt) { name = nt;}
-	void set_tl( class_method_list nn) { next = nn;}
+	void set_tl( class_method_list *nn) { next = nn;}
 };
 
