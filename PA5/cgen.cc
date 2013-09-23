@@ -361,12 +361,12 @@ static void emit_func_call_before( ostream &s)
 	emit_store( SELF, 8, SP, s);
 	emit_store( RA, 4, SP, s);
 	emit_addiu( FP, SP, 4, s);
-	emit_move( SELF, ACC);
+	emit_move( SELF, ACC, s);
 }
 
 static void emit_func_call_after( ostream &s)
 {
-	emit_move( ACC, SELF);
+	emit_move( ACC, SELF, s);
 	emit_load( RA, 4, SP, s);
 	emit_load( SELF, 8, SP, s);
 	emit_load( FP, 12, SP, s);
@@ -418,7 +418,7 @@ void StringEntry::code_def(ostream& s, int stringclasstag)
   code_ref(s);  s  << LABEL                                             // label
       << WORD << stringclasstag << endl                                 // tag
       << WORD << (DEFAULT_OBJFIELDS + STRING_SLOTS + (len+4)/4) << endl // size
-      << WORD; emit_disptable_ref(this, s); s << endl         // dispatch table
+      << WORD; emit_disptable_ref(Str, s); s << endl          // dispatch table
       << WORD;  lensym->code_ref(s);  s << endl;              // string length
   emit_string_constant(s,str);                                // ascii string
   s << ALIGN;                                                 // align to word
@@ -456,7 +456,7 @@ void IntEntry::code_def(ostream &s, int intclasstag)
   code_ref(s);  s << LABEL                                // label
       << WORD << intclasstag << endl                      // class tag
       << WORD << (DEFAULT_OBJFIELDS + INT_SLOTS) << endl  // object size
-      << WORD; emit_disptable_ref(this, s); s << endl     // dispatch table
+      << WORD; emit_disptable_ref(Int, s); s << endl      // dispatch table
       << WORD << str << endl;                             // integer value
 }
 
@@ -496,7 +496,7 @@ void BoolConst::code_def(ostream& s, int boolclasstag)
   code_ref(s);  s << LABEL                                  // label
       << WORD << boolclasstag << endl                       // class tag
       << WORD << (DEFAULT_OBJFIELDS + BOOL_SLOTS) << endl   // object size
-      << WORD; emit_disptable_ref(this, s); s << endl       // dispatch table
+      << WORD; emit_disptable_ref(Bool, s); s << endl       // dispatch table
       << WORD << val << endl;                               // value (0 or 1)
 }
 
@@ -644,7 +644,7 @@ void CgenClassTable::code_classobjtab()
 	str << CLASSOBJTAB << LABEL;
 	for ( List<CgenNode> *leg = ordered_nds; leg; leg = leg->tl())
 	{
-		l->hd()->code_classobjentry( str);
+		leg->hd()->code_classobjentry( str);
 	}
 }
 
@@ -657,7 +657,7 @@ void CgenClassTable::code_initializers()
 {
 	for ( List<CgenNode> *leg = ordered_nds; leg; leg = leg->tl())
 	{
-		leg->hd()->code_initializer();
+		leg->hd()->code_initializer( str);
 	}
 }
 
@@ -665,7 +665,7 @@ void CgenClassTable::code_class_methods()
 {
 	for ( List<CgenNode> *leg = ordered_nds; leg; leg = leg->tl())
 	{
-		leg->hd()->code_class_methods();
+		leg->hd()->code_class_methods( str);
 	}
 }
 
