@@ -418,13 +418,8 @@ void StringEntry::code_def(ostream& s, int stringclasstag)
   code_ref(s);  s  << LABEL                                             // label
       << WORD << stringclasstag << endl                                 // tag
       << WORD << (DEFAULT_OBJFIELDS + STRING_SLOTS + (len+4)/4) << endl // size
-      << WORD;
-
-
- /***** Add dispatch information for class String ******/
-
-      s << endl;                                              // dispatch table
-      s << WORD;  lensym->code_ref(s);  s << endl;            // string length
+      << WORD; emit_disptable_ref(this, s); s << endl         // dispatch table
+      << WORD;  lensym->code_ref(s);  s << endl;              // string length
   emit_string_constant(s,str);                                // ascii string
   s << ALIGN;                                                 // align to word
 }
@@ -461,12 +456,8 @@ void IntEntry::code_def(ostream &s, int intclasstag)
   code_ref(s);  s << LABEL                                // label
       << WORD << intclasstag << endl                      // class tag
       << WORD << (DEFAULT_OBJFIELDS + INT_SLOTS) << endl  // object size
-      << WORD;
-
- /***** Add dispatch information for class Int ******/
-
-      s << endl;                                          // dispatch table
-      s << WORD << str << endl;                           // integer value
+      << WORD; emit_disptable_ref(this, s); s << endl     // dispatch table
+      << WORD << str << endl;                             // integer value
 }
 
 
@@ -505,12 +496,8 @@ void BoolConst::code_def(ostream& s, int boolclasstag)
   code_ref(s);  s << LABEL                                  // label
       << WORD << boolclasstag << endl                       // class tag
       << WORD << (DEFAULT_OBJFIELDS + BOOL_SLOTS) << endl   // object size
-      << WORD;
-
- /***** Add dispatch information for class Bool ******/
-
-      s << endl;                                            // dispatch table
-      s << WORD << val << endl;                             // value (0 or 1)
+      << WORD; emit_disptable_ref(this, s); s << endl       // dispatch table
+      << WORD << val << endl;                               // value (0 or 1)
 }
 
 //////////////////////////////////////////////////////////////////////////////
@@ -1026,7 +1013,7 @@ void CgenNode::code_initializer( ostream &str)
 		str << JAL; emit_init_ref( parentnd->get_name(), str);
 		emit_func_call_after( str);
 
-		for ( int i( 0); features->more( i); i = features->next( i))
+		for ( int i = features->first(); features->more( i); i = features->next( i))
 		{
 			if ( !features->nth( i)->is_method())
 			{
@@ -1040,7 +1027,7 @@ void CgenNode::code_initializer( ostream &str)
 
 void CgenNode::code_class_methods( ostream &str)
 {
-	for ( int i( 0); features->more( i); i = features->next( i))
+	for ( int i = features->first(); features->more( i); i = features->next( i))
 	{
 		if ( features->nth( i)->is_method())
 		{
