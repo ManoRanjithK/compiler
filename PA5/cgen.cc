@@ -618,7 +618,7 @@ void CgenClassTable::code_constants()
 
 void CgenClassTable::code_prototypes()
 {
-	for(List<CgenNode> *l = nds; l; l = l->tl())
+	for(List<CgenNode> *l = ordered_nds; l; l = l->tl())
 	{
 		l->hd()->code_prototype( str);
 	}
@@ -627,9 +627,18 @@ void CgenClassTable::code_prototypes()
 void CgenClassTable::code_classnametab()
 {
 	str << CLASSNAMETAB << LABEL;
-	for(List<CgenNode> *l = nds; l; l = l->tl())
+	for(List<CgenNode> *l = ordered_nds; l; l = l->tl())
 	{
 		l->hd()->code_classnameentry( str);
+	}
+}
+
+void CgenClassTable::code_classobjtab()
+{
+	str << CLASSOBJTAB << LABEL;
+	for(List<CgenNode> *l = ordered_nds; l; l = l->tl())
+	{
+		l->hd()->code_classobjentry( str);
 	}
 }
 
@@ -638,7 +647,7 @@ void CgenClassTable::code_disptabs()
 	root()->walk_down_code_disptab( str);
 }
 
-CgenClassTable::CgenClassTable(Classes classes, ostream& s) : nds(NULL) , str(s)
+CgenClassTable::CgenClassTable(Classes classes, ostream& s) : nds(NULL) , str(s), ordered_nds(NULL)
 {
    enterscope();
    if (cgen_debug) cout << "Building CgenClassTable" << endl;
@@ -812,7 +821,10 @@ void CgenClassTable::install_classes(Classes cs)
 void CgenClassTable::build_inheritance_tree()
 {
   for(List<CgenNode> *l = nds; l; l = l->tl())
+  {
       set_relations(l->hd());
+      ordered_nds = new List<CgenNode>( l->hd(), ordered_nds);
+  }
 }
 
 //
@@ -918,6 +930,12 @@ void CgenNode::code_classnameentry( ostream &str)
 	str << WORD; class_name_entry->code_ref( str);
 }
 
+void CgenNode::code_classobjentry( ostream &str)
+{
+	str << WORD; emit_protobj_ref( get_name(), str);
+	str << WORD; emit_init_ref( get_name(), str);
+}
+
 void CgenNode::code_prototype( ostream &str)
 {
 	// Basic classes are coded into constants section.
@@ -982,7 +1000,11 @@ void CgenClassTable::code()
   if (cgen_debug) cout << "coding prototypes" << endl;
   code_prototypes();
 
+  if (cgen_debug) cout << "coding class name tables" << endl;
   code_classnametab();
+
+  if (cgen_debug) cout << "coding class object tables" << endl;
+  code_classobjtab();
 
   if (cgen_debug) cout << "coding dispatch tables" << endl;
   code_disptabs();

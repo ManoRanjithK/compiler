@@ -22,6 +22,8 @@ private:
    int intclasstag;
    int boolclasstag;
 
+   List<CgenNode> *ordered_nds;
+
 
 // The following methods emit code for
 // constants and global declarations.
@@ -34,6 +36,7 @@ private:
 
    void code_prototypes();
    void code_classnametab();
+   void code_classobjtab();
    void code_disptabs();
 
 // The following creates an inheritance graph from
@@ -88,6 +91,7 @@ public:
 
    void code_prototype( ostream &str);
    void code_classnameentry( ostream &str);
+   void code_classobjentry( ostream &str);
    void walk_down_code_disptab( ostream &str);
 
    static void set_class_count( int count) { CgenNode::class_count = count;}
