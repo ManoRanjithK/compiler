@@ -868,17 +868,17 @@ void CgenNode::count_Features()
 {
 	for ( int i = features->first(); features->more( i); i = features->next( i))
 	{
+		Symbol name = features->nth( i)->get_name();
+
 		if ( features->nth( i)->is_method())
 		{
-			Symbol name = features->nth( i)->get_name();
-
 			++dispatch_table_size;
 			method_list = new class_method_list( name, method_list);
 			::method_table.addid( name, get_name());
 		}
 		else
 		{
-			++object_size;
+			this->member_table.addid( name, ( void *)(object_size++));
 		}
 	}
 }
@@ -887,8 +887,15 @@ void CgenNode::walk_down_code_disptab( ostream &str)
 {
 	::method_table.enterscope();
 
-	object_size = parentnd->object_size;
+	if ( get_name() != Object)
+	{
+		object_size = parentnd->object_size;
+		tihs->member_table = p->member_table;
+	}
+	tihs->member_table.enterscope();
+
 	count_Features();
+
 	if ( get_name() != Object)
 	{
 		class_method_list *methods = parentnd->method_list;
