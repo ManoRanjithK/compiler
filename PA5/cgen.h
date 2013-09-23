@@ -69,6 +69,7 @@ private:
    List<CgenNode> *children;                  // Children of class
    Basicness basic_status;                    // `Basic' if class is basic
                                               // `NotBasic' otherwise
+   SymbolTable< Symbol, void> member_table;
    int object_size;
    class_method_list *method_list;
    int dispatch_table_size;

@@ -886,11 +886,11 @@ void CgenNode::count_Features()
 void CgenNode::walk_down_code_disptab( ostream &str)
 {
 	::method_table.enterscope();
+
+	object_size = parentnd->object_size;
 	count_Features();
 	if ( get_name() != Object)
 	{
-		object_size += parentnd->object_size;
-
 		class_method_list *methods = parentnd->method_list;
 		class_method_list *inhe_method_list = new class_method_list( NULL, method_list);
 		class_method_list *last_inhe_method = inhe_method_list;
@@ -1097,9 +1097,10 @@ CgenNode::CgenNode(Class_ nd, Basicness bstatus, CgenClassTableP ct) :
    parentnd(NULL),
    children(NULL),
    basic_status(bstatus),
-   class_tag( class_count++)
+   class_tag( class_count++),
+   object_size( 0),
+   dispatch_table_size( 0)
 {
-   object_size = dispatch_table_size = 0;
    class_name_entry = stringtable.add_string(name->get_string());          // Add class name to string table
 }
 
