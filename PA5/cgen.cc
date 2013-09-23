@@ -1017,7 +1017,7 @@ void CgenNode::code_initializer( ostream &str)
 		{
 			if ( !features->nth( i)->is_method())
 			{
-				features->nth( i)->code();
+				features->nth( i)->code( str);
 			}
 		}
 	}
@@ -1031,7 +1031,7 @@ void CgenNode::code_class_methods( ostream &str)
 	{
 		if ( features->nth( i)->is_method())
 		{
-			features->nth( i)->code();
+			features->nth( i)->code( str);
 		}
 	}
 }
@@ -1113,6 +1113,12 @@ CgenNode::CgenNode(Class_ nd, Basicness bstatus, CgenClassTableP ct) :
 //   constant integers, strings, and booleans are provided.
 //
 //*****************************************************************
+
+void attr_class::code( ostream &s) {
+}
+
+void method_class::code( ostream &s) {
+}
 
 void assign_class::code(ostream &s) {
 }
