@@ -420,24 +420,28 @@ static void emit_func_call( Symbol class_name, Symbol method_name, ostream &s)
 
 static void emit_not( char *dest_reg, char *soruce_reg, ostream &s)
 {
-	s << NOT << dest << " " << source_reg << endl;
+	s << NOT << dest_reg << " " << source_reg << endl;
 }
 
 static void emit_slt( char *dest_ret, char *src0_reg, char *src1_reg, ostream &s)
 {
-	s << SLT << dest << " " << src1 << " " << src2 << endl;
+	s << SLT << dest_reg << " " << src0_reg << " " << src1_reg << endl;
 }
 
 static void emit_nor( char *dest_reg, char *soruce_reg, ostream &s)
 {
-	s << NOR << dest << " " << source_reg << endl;
+	s << NOR << dest_reg << " " << source_reg << endl;
 }
 
 static void emit_xor( char *dest_reg, char *soruce_reg, ostream &s)
 {
-	s << XOR << dest << " " << source_reg << endl;
+	s << XOR << dest_reg << " " << source_reg << endl;
 }
 
+static void emit_sll( char *dest_reg, char *soruce_reg, int bits, ostream &s)
+{
+	s << SLL << dest_reg << " " << source_reg << << " " << bits << endl;
+}
 
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -1345,6 +1349,28 @@ void bool_const_class::code(ostream& s)
 }
 
 void new__class::code(ostream &s) {
+	if ( type_name = SELF_TYPE)
+	{
+		// Calcu address
+		emit_load( T0, TAG_OFFSET, SELF, s);
+		emit_sll( T0, T0, 1, s);
+
+		emit_load_address( S1, CLASSOBJTAB, s);
+		emit_addu( S1, T0, S1, s);
+
+		// Call copy.
+		emit_load( ACC, 0, S1, s);
+		s << JAL; emit_method_ref( Object, copy, s);
+
+		// Run init.
+		emit_load( ACC, 4, S1, s);
+		emit_jalr( ACC, s);
+	}
+	else
+	{
+		emit_new( type_name);
+		s << JAL; emit_init_ref( type_name, s);
+	}
 }
 
 void isvoid_class::code(ostream &s) {

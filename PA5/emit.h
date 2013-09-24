@@ -111,4 +111,6 @@
 #define SLT   "\tslt\n"
 #define NOR   "\tnor\n"
 #define XOR   "\txor\n"
+#define SLL   "\tsll\n"
 
+#define S1    "s1"
