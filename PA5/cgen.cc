@@ -381,22 +381,28 @@ static void emit_func_call_after( ostream &s)
 	emit_addiu( SP, SP, 12, s);
 }
 
-static void emit_new_int( char *val_reg, char *addr_reg, ostream &s)
+static void emit_new( Symbol name, ostream &s)
 {
+	emit_partial_load_address( ACC, s); emit_protobj_ref( name, s);
+	s << JAL; emit_method_ref( Object, copy, s);
 }
 
-static void emit_assign( Symbol name, char *source_reg, ostream &s)
+int expr_is_const = 0;
+int object_offset = 0;
+char *offset_base = NULL;
+
+static void lookup_var( Symbol name)
 {
-	int offset = ( int) ( var_table->probe( name));
-	if ( !offset)
+	object_offset = ( int) ( var_table->probe( name));
+	if ( !object_offset)
 	{
-		offset = ( int) ( var_table->lookup( name));
-		emit_store( source_reg, offset << 2, SELF, s);
+		object_offset = ( int) ( var_table->lookup( name));
+		offset_base = SELF;
 	}
 	else
 	{
-		offset -= DEFAULT_OBJFIELDS;
-		emit_store( source_reg, offset << 2, FP, s);
+		object_offset -= DEFAULT_OBJFIELDS;
+		offset_base = FP;
 	}
 }
 
@@ -416,6 +422,22 @@ static void emit_not( char *dest_reg, char *soruce_reg, ostream &s)
 {
 	s << NOT << dest << " " << source_reg << endl;
 }
+
+static void emit_slt( char *dest_ret, char *src0_reg, char *src1_reg, ostream &s)
+{
+	s << SLT << dest << " " << src1 << " " << src2 << endl;
+}
+
+static void emit_nor( char *dest_reg, char *soruce_reg, ostream &s)
+{
+	s << NOR << dest << " " << source_reg << endl;
+}
+
+static void emit_xor( char *dest_reg, char *soruce_reg, ostream &s)
+{
+	s << XOR << dest << " " << source_reg << endl;
+}
+
 
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -1200,7 +1222,8 @@ void method_class::code( ostream &s) {
 
 void assign_class::code(ostream &s) {
 	expr->code();
-	emit_assign( name, ACC, s);
+	lookup_var( name);
+	emit_store( source_reg, object_offset << 2, offset_base, s);
 }
 
 void static_dispatch_class::code(ostream &s) {
@@ -1219,57 +1242,84 @@ void typcase_class::code(ostream &s) {
 }
 
 void block_class::code(ostream &s) {
+	body->code();
 }
 
 void let_class::code(ostream &s) {
 }
 
-#define ARITH_CODE( t0, t1, s)\
+#define ARITH_CODE( t0, t1, cmd, s)\
 {\
 	e1->code();\
-	emit_fetch_int( t0, ACC, s);\
+	int e1_is_const = expr_is_const;\
+	emit_move( t0, ACC, s);\
 	e2->code();\
-	emit_fetch_int( t1, ACC, s);\
+	int e2_is_const = expr_is_const;\
+	emit_move( t1, ACC, s);\
+	if ( e2_is_const)\
+	{\
+		if ( !e1_is_const)\
+		{\
+			emit_move( ACC, t0, s);\
+		}\
+		else\
+		{\
+			emit_new( Int, s);\
+		}\
+	}\
+	emit_fetch_int( t0, t0, s);\
+	emit_fetch_int( t1, t1, s);\
+	emit_##cmd( t0, t0, t1, s);\
+	emit_store_int( t0, ACC, s);\
+	expr_is_const = 0;\
 }
 
 void plus_class::code(ostream &s) {
-	ARITH_CODE( T0, T1, s);
-	emit_add( T0, T1, T0, s);
-	emit_new_int( T0, ACC, s);
+	ARITH_CODE( T0, T1, add, s);
 }
 
 void sub_class::code(ostream &s) {
-	ARITH_CODE( T0, T1, s);
-	emit_sub( T0, T0, T1, s);
-	emit_new_int( T0, ACC, s);
+	ARITH_CODE( T0, T1, sub, s);
 }
 
 void mul_class::code(ostream &s) {
-	ARITH_CODE( T0, T1, s);
-	emit_mul( T0, T0, T1, s);
-	emit_new_int( T0, ACC, s);
+	ARITH_CODE( T0, T1, mul, s);
 }
 
 void divide_class::code(ostream &s) {
-	ARITH_CODE( T0, T1, s);
-	emit_div( T0, T0, T1, s);
-	emit_new_int( T0, ACC, s);
+	ARITH_CODE( T0, T1, div, s);
 }
 
 void neg_class::code(ostream &s) {
 	e1->code();
 	emit_fetch_int( T0, ACC, s);
 	emit_neg( T0, T0, s);
-	emit_new_int( T0, ACC, s);
+	if ( expr_is_const)
+	{
+		emit_new( Int, s);
+	}
+	emit_sotre_int( T0, ACC, s);
+	expr_is_const = 0;
 }
 
 void lt_class::code(ostream &s) {
+	e1->code();
+	emit_fetch_int( T0, ACC, s);
+	e2->code();
+	emit_fetch_int( T1, ACC, s);
+	emit_slt( ACC, T0, T1, s);
 }
 
 void eq_class::code(ostream &s) {
 }
 
 void leq_class::code(ostream &s) {
+	e1->code();
+	emit_fetch_int( T0, ACC, s);
+	e2->code();
+	emit_fetch_int( T1, ACC, s);
+	emit_slt( ACC, T1, T0, s);
+	emit_not( ACC, ACC, s);
 }
 
 void comp_class::code(ostream &s) {
@@ -1281,6 +1331,7 @@ void int_const_class::code(ostream& s)
   // Need to be sure we have an IntEntry *, not an arbitrary Symbol
   //
   emit_load_int(ACC,inttable.lookup_string(token->get_string()),s);
+  expr_is_const = 1;
 }
 
 void string_const_class::code(ostream& s)
@@ -1319,6 +1370,8 @@ void no_expr_class::code(ostream &s) {
 }
 
 void object_class::code(ostream &s) {
+	lookup_var( name);
+	emit_addiu( ACC, offset_base, object_offset << 2, s);
 }
 
 

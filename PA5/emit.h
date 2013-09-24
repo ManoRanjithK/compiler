@@ -108,4 +108,7 @@
 
 // Ops by Jing Yang
 #define NOT   "\tnot\n"
+#define SLT   "\tslt\n"
+#define NOR   "\tnor\n"
+#define XOR   "\txor\n"
 
