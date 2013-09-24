@@ -106,4 +106,6 @@
 #define BLT      "\tblt\t"
 #define BGT      "\tbgt\t"
 
+// Ops by Jing Yang
+#define NOT   "\tnot\n"
 

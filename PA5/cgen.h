@@ -59,8 +59,6 @@ public:
 };
 
 
-SymbolTable< Symbol, Entry> method_table;
-
 struct class_method_list;
 
 class CgenNode : public class__class {
@@ -69,7 +67,10 @@ private:
    List<CgenNode> *children;                  // Children of class
    Basicness basic_status;                    // `Basic' if class is basic
                                               // `NotBasic' otherwise
-   SymbolTable< Symbol, void> member_table;
+   SymbolTable< Symbol, void> member_offset_table;
+   SymbolTable< Symbol, void> method_offset_table;
+   SymbolTable< Symbol, Symbol> method_table;
+
    int object_size;
    class_method_list *method_list;
    int dispatch_table_size;
@@ -93,10 +94,12 @@ public:
    CgenNodeP get_parentnd() { return parentnd; }
    int basic() { return (basic_status == Basic); }
 
+   void walk_down();
+
    void code_prototype( ostream &str);
    void code_classnameentry( ostream &str);
    void code_classobjentry( ostream &str);
-   void walk_down_code_disptab( ostream &str);
+   void code_disptab( ostream &str);
    void code_initializer( ostream &str);
    void code_class_methods( ostream &str);
 

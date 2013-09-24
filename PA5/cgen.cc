@@ -116,6 +116,8 @@ static char *gc_collect_names[] =
 BoolConst falsebool(FALSE);
 BoolConst truebool(TRUE);
 
+CgenClassTableP global_table = NULL;
+
 //*********************************************************
 //
 // Define method for code generation
@@ -322,6 +324,12 @@ static void emit_push(char *reg, ostream& str)
   emit_addiu(SP,SP,-4,str);
 }
 
+static void emit_pop( char *reg, ostream& str)
+{
+	emit_addiu( SP, SP, 4, str);
+	emit_load( reg, 0, SP, str);
+}
+
 //
 // Fetch the integer value in an Int object.
 // Emits code to fetch the integer value of the Integer object pointed
@@ -371,6 +379,42 @@ static void emit_func_call_after( ostream &s)
 	emit_load( SELF, 8, SP, s);
 	emit_load( FP, 12, SP, s);
 	emit_addiu( SP, SP, 12, s);
+}
+
+static void emit_new_int( char *val_reg, char *addr_reg, ostream &s)
+{
+}
+
+static void emit_assign( Symbol name, char *source_reg, ostream &s)
+{
+	int offset = ( int) ( var_table->probe( name));
+	if ( !offset)
+	{
+		offset = ( int) ( var_table->lookup( name));
+		emit_store( source_reg, offset << 2, SELF, s);
+	}
+	else
+	{
+		offset -= DEFAULT_OBJFIELDS;
+		emit_store( source_reg, offset << 2, FP, s);
+	}
+}
+
+static void emit_func_call( Symbol class_name, Symbol method_name, ostream &s)
+{
+	CgenNodeP node = global_table->lookup( class_name);
+	int offset = ( ( int)( node->method_offset_table.lookup( method_name))) - DEFAULT_OBJFIELDS;
+
+	emit_push( ACC, s);
+	emit_partial_load_address( ACC, s); emit_disptable_ref( class_name, s);
+	emit_load( ACC, offset << 2, ACC, s);
+	emit_jalr( ACC, s);
+	emit_pop( ACC, s);
+}
+
+static void emit_not( char *dest_reg, char *soruce_reg, ostream &s)
+{
+	s << NOT << dest << " " << source_reg << endl;
 }
 
 
@@ -650,7 +694,10 @@ void CgenClassTable::code_classobjtab()
 
 void CgenClassTable::code_disptabs()
 {
-	root()->walk_down_code_disptab( str);
+	for ( List<CgenNode> *leg = ordered_nds; leg; leg = leg->tl())
+	{
+		leg->hd()->code_disptab( str);
+	}
 }
 
 void CgenClassTable::code_initializers()
@@ -683,7 +730,10 @@ CgenClassTable::CgenClassTable(Classes classes, ostream& s) : nds(NULL) , str(s)
 
    build_inheritance_tree();
 
+   root()->walk_down();
+
    code();
+
    exitscope();
 }
 
@@ -702,6 +752,7 @@ void CgenClassTable::install_basic_classes()
 // SELF_TYPE is the self class; it cannot be redefined or inherited.
 // prim_slot is a class known to the code generator.
 //
+  global_table = this;
   CgenNode::set_class_count( -3);
 
   addid(No_class,
@@ -864,6 +915,8 @@ void CgenClassTable::set_relations(CgenNodeP nd)
 
 int CgenNode::class_count = 0;
 
+SymbolTable< Symbol, void> *var_table;
+
 void CgenNode::count_Features()
 {
 	for ( int i = features->first(); features->more( i); i = features->next( i))
@@ -872,74 +925,75 @@ void CgenNode::count_Features()
 
 		if ( features->nth( i)->is_method())
 		{
-			++dispatch_table_size;
-			method_list = new class_method_list( name, method_list);
-			::method_table.addid( name, get_name());
+			if ( !this->method_table.lookup( name))
+			{
+				this->method_offset_table.addid( name,
+						( void *)( dispatch_table_size++ + DEFAULT_OBJFIELDS));
+				method_list->set_tl( new class_method_list( name));
+				method_list = method_list->tl();
+
+			}
+			this->method_table.addid( name, get_name());
 		}
 		else
 		{
-			this->member_table.addid( name, ( void *)(object_size++));
+			this->member_offset_table.addid( name,
+					( void *)( object_size++ + DEFAULT_OBJFIELDS));
 		}
 	}
 }
 
-void CgenNode::walk_down_code_disptab( ostream &str)
+void CgenNode::code_disptab( ostream &str)
 {
-	::method_table.enterscope();
-
-	if ( get_name() != Object)
-	{
-		object_size = parentnd->object_size;
-		tihs->member_table = p->member_table;
-	}
-	tihs->member_table.enterscope();
-
-	count_Features();
-
-	if ( get_name() != Object)
-	{
-		class_method_list *methods = parentnd->method_list;
-		class_method_list *inhe_method_list = new class_method_list( NULL, method_list);
-		class_method_list *last_inhe_method = inhe_method_list;
-
-		while ( methods)
-		{
-			Symbol method_id = methods->hd();
-			if ( !::method_table.probe( method_id))
-			{
-				Symbol class_name = ::method_table.lookup( method_id);
-
-				++dispatch_table_size;
-
-				::method_table.addid( method_id, class_name);
-
-				last_inhe_method->set_tl( new class_method_list( method_id, method_list));
-				last_inhe_method = last_inhe_method->tl();
-			}
-			methods = methods->tl();
-		}
-		method_list = inhe_method_list->tl();
-		// delete inhe_method_list;
-	}
-
 	emit_disptable_ref( get_name(), str); str << LABEL;
 
 	class_method_list *methods = method_list;
 	while ( methods)
 	{
 		Symbol method_id = methods->hd();
-		Symbol class_id = ::method_table.lookup( method_id);
+		Symbol class_id = method_table.lookup( method_id);
 
 		str << WORD; emit_method_ref( class_id, method_id, str);
 
 		methods = methods->tl();
 	}
+}
+
+void CgenNode::walk_down()
+{
+	class_method_list *method_list_head = new class_method_list( NULL, NULL);
+	method_list = method_list_head;
+
+	if ( get_name() != Object)
+	{
+		dispatch_table_size = parentnd->dispatch_table_size;
+		object_size = parentnd->object_size;
+
+		this->member_offset_table = p->member_offset_table;
+		this->method_offset_table = p->method_offset_table;
+		this->method_table = p->method_table;
+
+		class_method_list *inhe_methods = parentnd->method_list;
+		while ( inhe_methods)
+		{
+			method_list->set_tl( new class_method_list( inhe_methods->hd()));
+			method_list = method_list->tl();
+			inhe_methods = inhe_methods->tl();
+		}
+	}
+	this->member_offset_table.enterscope();
+	this->method_offset_table.enterscope();
+	this->method_table.enterscope();
+
+	count_Features();
+
+	method_list = method_list_head->tl();
+	// delete method_list_head;
 
 	for ( List<CgenNode> *leg = children; leg; leg = leg->tl())
 	{
-		leg->hd()->walk_down_code_disptab( str);
+		leg->hd()->walk_down();
 	}
-	::method_table.exitscope();
 }
 
 void CgenNode::add_child(CgenNodeP n)
@@ -1024,6 +1078,7 @@ void CgenNode::code_initializer( ostream &str)
 		{
 			if ( !features->nth( i)->is_method())
 			{
+				::var_table = &( this->member_offset_table);
 				features->nth( i)->code( str);
 			}
 		}
@@ -1038,6 +1093,7 @@ void CgenNode::code_class_methods( ostream &str)
 	{
 		if ( features->nth( i)->is_method())
 		{
+			::var_table = &( this->member_offset_table);
 			features->nth( i)->code( str);
 		}
 	}
@@ -1123,12 +1179,28 @@ CgenNode::CgenNode(Class_ nd, Basicness bstatus, CgenClassTableP ct) :
 //*****************************************************************
 
 void attr_class::code( ostream &s) {
+	init->code( s);
+	int offset = ( int)( var_table->lookup( get_name()));
+	emit_store( ACC, offset << 2, SELF, str);
 }
 
 void method_class::code( ostream &s) {
+	var_table->enterscope();
+
+	int cnt = 0;
+	for ( int i = formals->first(); formals->more( i); i = formals->next( i))
+	{
+		// should use a get_name method here.
+		var_table->addid( formals->nth( i)->name, ( void *)( ++cnt));
+	}
+	body->code( s);
+
+	var_table->exitscope();
 }
 
 void assign_class::code(ostream &s) {
+	expr->code();
+	emit_assign( name, ACC, s);
 }
 
 void static_dispatch_class::code(ostream &s) {
@@ -1152,19 +1224,43 @@ void block_class::code(ostream &s) {
 void let_class::code(ostream &s) {
 }
 
+#define ARITH_CODE( t0, t1, s)\
+{\
+	e1->code();\
+	emit_fetch_int( t0, ACC, s);\
+	e2->code();\
+	emit_fetch_int( t1, ACC, s);\
+}
+
 void plus_class::code(ostream &s) {
+	ARITH_CODE( T0, T1, s);
+	emit_add( T0, T1, T0, s);
+	emit_new_int( T0, ACC, s);
 }
 
 void sub_class::code(ostream &s) {
+	ARITH_CODE( T0, T1, s);
+	emit_sub( T0, T0, T1, s);
+	emit_new_int( T0, ACC, s);
 }
 
 void mul_class::code(ostream &s) {
+	ARITH_CODE( T0, T1, s);
+	emit_mul( T0, T0, T1, s);
+	emit_new_int( T0, ACC, s);
 }
 
 void divide_class::code(ostream &s) {
+	ARITH_CODE( T0, T1, s);
+	emit_div( T0, T0, T1, s);
+	emit_new_int( T0, ACC, s);
 }
 
 void neg_class::code(ostream &s) {
+	e1->code();
+	emit_fetch_int( T0, ACC, s);
+	emit_neg( T0, T0, s);
+	emit_new_int( T0, ACC, s);
 }
 
 void lt_class::code(ostream &s) {
@@ -1194,16 +1290,32 @@ void string_const_class::code(ostream& s)
 
 void bool_const_class::code(ostream& s)
 {
-  emit_load_bool(ACC, BoolConst(val), s);
+	emit_load_imm( ACC, val, s);
 }
 
 void new__class::code(ostream &s) {
 }
 
 void isvoid_class::code(ostream &s) {
+	e1->code();
+
+	emit_not( ACC, ACC, s);
+	/*
+	int else_label = new_label();
+	int end_label = new_label();
+
+	emit_load_imm( T1, 0, s);
+	emit_bne( ACC, T1, else_label);
+	emit_load_bool( ACC, BoolConst(1), s);
+	emit_branch( end_label, s);
+	emit_label_def( else_label);
+	emit_load_bool( ACC, BoolConst(0), s);
+	emit_label_def( end_label, s);
+	*/
 }
 
 void no_expr_class::code(ostream &s) {
+	emit_load_imm( ACC, 0, s);
 }
 
 void object_class::code(ostream &s) {

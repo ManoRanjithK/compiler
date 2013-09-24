@@ -7,16 +7,16 @@ static int ascii = 0;
 
 void ascii_mode(ostream& str)
 {
-  if (!ascii) 
+  if (!ascii)
     {
       str << "\t.ascii\t\"";
       ascii = 1;
-    } 
+    }
 }
 
 void byte_mode(ostream& str)
 {
-  if (ascii) 
+  if (ascii)
     {
       str << "\"\n";
       ascii = 0;
@@ -46,12 +46,12 @@ void emit_string_constant(ostream& str, char* s)
       str << "\\\"";
       break;
     default:
-      if (*s >= ' ' && ((unsigned char) *s) < 128) 
+      if (*s >= ' ' && ((unsigned char) *s) < 128)
 	{
 	  ascii_mode(str);
 	  str << *s;
 	}
-      else 
+      else
 	{
 	  byte_mode(str);
 	  str << "\t.byte\t" << (int) ((unsigned char) *s) << endl;
@@ -64,4 +64,8 @@ void emit_string_constant(ostream& str, char* s)
   str << "\t.byte\t0\t" << endl;
 }
 
-
+int new_label()
+{
+	static int label_count = 0;
+	return lable_count++;
+}
