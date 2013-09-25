@@ -1252,46 +1252,50 @@ void block_class::code(ostream &s) {
 void let_class::code(ostream &s) {
 }
 
-#define ARITH_CODE( t0, t1, cmd, s)\
+#define ARITH_CODE( cmd, s)\
 {\
 	e1->code();\
 	int e1_is_const = expr_is_const;\
-	emit_move( t0, ACC, s);\
+	emit_push( S1, s);\
+	emit_move( S1, ACC, s);\
 	e2->code();\
 	int e2_is_const = expr_is_const;\
-	emit_move( t1, ACC, s);\
+	emit_move( T0, ACC, s);\
 	if ( e2_is_const)\
 	{\
 		if ( !e1_is_const)\
 		{\
-			emit_move( ACC, t0, s);\
+			emit_move( ACC, S1, s);\
 		}\
 		else\
 		{\
+			emit_push( T0, s);\
 			emit_new( Int, s);\
+			emit_pop( T0, s);\
 		}\
 	}\
-	emit_fetch_int( t0, t0, s);\
-	emit_fetch_int( t1, t1, s);\
-	emit_##cmd( t0, t0, t1, s);\
-	emit_store_int( t0, ACC, s);\
+	emit_fetch_int( S1, S1, s);\
+	emit_fetch_int( T0, T0, s);\
+	emit_##cmd( T0, S1, T0, s);\
+	emit_store_int( T0, ACC, s);\
+	emit_pop( S1);\
 	expr_is_const = 0;\
 }
 
 void plus_class::code(ostream &s) {
-	ARITH_CODE( T0, T1, add, s);
+	ARITH_CODE( add, s);
 }
 
 void sub_class::code(ostream &s) {
-	ARITH_CODE( T0, T1, sub, s);
+	ARITH_CODE( sub, s);
 }
 
 void mul_class::code(ostream &s) {
-	ARITH_CODE( T0, T1, mul, s);
+	ARITH_CODE( mul, s);
 }
 
 void divide_class::code(ostream &s) {
-	ARITH_CODE( T0, T1, div, s);
+	ARITH_CODE( div, s);
 }
 
 void neg_class::code(ostream &s) {
@@ -1300,7 +1304,9 @@ void neg_class::code(ostream &s) {
 	emit_neg( T0, T0, s);
 	if ( expr_is_const)
 	{
+		emit_push( T0, s);
 		emit_new( Int, s);
+		emit_pop( T0, s);
 	}
 	emit_sotre_int( T0, ACC, s);
 	expr_is_const = 0;
@@ -1308,10 +1314,12 @@ void neg_class::code(ostream &s) {
 
 void lt_class::code(ostream &s) {
 	e1->code();
-	emit_fetch_int( T0, ACC, s);
+	emit_push( S1, s);
+	emit_fetch_int( S1, ACC, s);
 	e2->code();
-	emit_fetch_int( T1, ACC, s);
-	emit_slt( ACC, T0, T1, s);
+	emit_fetch_int( ACC, ACC, s);
+	emit_slt( ACC, S1, ACC, s);
+	emit_pop( S1, s);
 }
 
 void eq_class::code(ostream &s) {
@@ -1319,11 +1327,13 @@ void eq_class::code(ostream &s) {
 
 void leq_class::code(ostream &s) {
 	e1->code();
-	emit_fetch_int( T0, ACC, s);
+	emit_push( S1, s);
+	emit_fetch_int( S1, ACC, s);
 	e2->code();
-	emit_fetch_int( T1, ACC, s);
-	emit_slt( ACC, T1, T0, s);
+	emit_fetch_int( ACC, ACC, s);
+	emit_slt( ACC, ACC, S1, s);
 	emit_not( ACC, ACC, s);
+	emit_pop( S1, s);
 }
 
 void comp_class::code(ostream &s) {
@@ -1355,6 +1365,7 @@ void new__class::code(ostream &s) {
 		emit_load( T0, TAG_OFFSET, SELF, s);
 		emit_sll( T0, T0, 1, s);
 
+		emit_push( S1, s);
 		emit_load_address( S1, CLASSOBJTAB, s);
 		emit_addu( S1, T0, S1, s);
 
@@ -1365,6 +1376,7 @@ void new__class::code(ostream &s) {
 		// Run init.
 		emit_load( ACC, 4, S1, s);
 		emit_jalr( ACC, s);
+		emit_pop( S1, s);
 	}
 	else
 	{

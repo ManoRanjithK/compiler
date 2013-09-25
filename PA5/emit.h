@@ -114,3 +114,4 @@
 #define SLL   "\tsll\n"
 
 #define S1    "s1"
+#define S2    "s2"
