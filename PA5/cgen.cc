@@ -766,6 +766,7 @@ CgenClassTable::CgenClassTable(Classes classes, ostream& s) : nds(NULL) , str(s)
 
    build_inheritance_tree();
 
+   CgenNode::set_class_count( 0);
    root()->walk_down();
 
    code();
@@ -999,6 +1000,8 @@ void CgenNode::code_disptab( ostream &str)
 
 void CgenNode::walk_down()
 {
+	class_tag = class_count++;
+
 	class_method_list *method_list_head = new class_method_list( NULL, NULL);
 	method_list = method_list_head;
 
@@ -1028,9 +1031,11 @@ void CgenNode::walk_down()
 	method_list = method_list_head->tl();
 	// delete method_list_head;
 
+	max_class_tag = class_tag;
 	for ( List<CgenNode> *leg = children; leg; leg = leg->tl())
 	{
 		leg->hd()->walk_down();
+		max_class_tag = max( max_class_tag, leg->hd()->class_tag);
 	}
 }
 
@@ -1078,18 +1083,18 @@ void CgenNode::code_prototype( ostream &str)
 		{
 			switch ( leg->hd()->class_tag)
 			{
-				case 2:
+				case 1:
 					// IO member.
 					break;
-				case 5:
+				case 2:
 					// Int member.
 					prefix = INTCONST_PREFIX;
 					break;
-				case 6:
+				case 3:
 					// Bool member.
 					prefix = BOOLCONST_PREFIX;
 					break;
-				case 7:
+				case 4:
 					// String member.
 					prefix = STRCONST_PREFIX;
 					break;

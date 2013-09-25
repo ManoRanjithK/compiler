@@ -81,12 +81,13 @@ private:
 
    void count_Features();
 
+   int class_tag;
+   int max_class_tag;
+
 public:
    CgenNode(Class_ c,
             Basicness bstatus,
             CgenClassTableP class_table);
-
-   const int class_tag;
 
    void add_child(CgenNodeP child);
    List<CgenNode> *get_children() { return children; }
