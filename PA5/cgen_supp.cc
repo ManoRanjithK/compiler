@@ -69,3 +69,14 @@ int new_label()
 	static int label_count = 0;
 	return lable_count++;
 }
+
+static int temp_offset;
+int init_alloc_temp()
+{
+	temp_offset = 0;
+}
+
+int alloc_temp()
+{
+	return temp_offset++;
+}

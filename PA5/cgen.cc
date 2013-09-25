@@ -395,7 +395,7 @@ char *offset_base = NULL;
 
 static void lookup_var( Symbol name)
 {
-	object_offset = ( int) ( var_table->probe( name));
+	object_offset = ( int) ( method_var_table->lookup( name));
 	if ( !object_offset)
 	{
 		object_offset = ( int) ( var_table->lookup( name));
@@ -951,7 +951,9 @@ void CgenClassTable::set_relations(CgenNodeP nd)
 
 int CgenNode::class_count = 0;
 
+SymbolTable< Symbol, void> global_method_var_table;
 SymbolTable< Symbol, void> *var_table;
+SymbolTable< Symbol, void> *method_var_table = &global_method_var_table;
 
 void CgenNode::count_Features()
 {
@@ -1234,23 +1236,23 @@ int attr_class::get_temp_size() {
 }
 
 void method_class::code( ostream &s) {
-	var_table->enterscope();
+	method_var_table->enterscope();
 
 	s << name << LABEL << endl;
 
 	emit_func_call_before( 0, s);
 
-	int cnt = 0;
+	int cnt = DEFAULT_OBJFIELDS;
 	for ( int i = formals->first(); formals->more( i); i = formals->next( i))
 	{
 		// should use a get_name method here.
-		var_table->addid( formals->nth( i)->name, ( void *)( ++cnt));
+		method_var_table->addid( formals->nth( i)->name, ( void *)( cnt++));
 	}
 	body->code( s);
 
 	emit_func_call_after( 0, s);
 
-	var_table->exitscope();
+	method_var_table->exitscope();
 }
 
 int method_class::get_temp_size() {
@@ -1375,6 +1377,12 @@ int block_class::get_temp_size() {
 
 void let_class::code(ostream &s) {
 	init->code( s);
+	int offset = alloc_temp();
+	emit_store( ACC, offset << 2, FP, s);
+	method_var_table->enterscope();
+	method_var_table->addid( identifier, ( void *)( offset + DEFAULT_OBJFIELDS));
+	body->code( s);
+	method_var_table->exitscope();
 }
 
 int let_class::get_temp_size() {
