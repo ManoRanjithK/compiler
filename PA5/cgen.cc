@@ -1220,6 +1220,10 @@ void attr_class::code( ostream &s) {
 	emit_store( ACC, offset << 2, SELF, str);
 }
 
+int attr_class::get_temp_size() {
+	return init->get_temp_size();
+}
+
 void method_class::code( ostream &s) {
 	var_table->enterscope();
 
@@ -1240,10 +1244,23 @@ void method_class::code( ostream &s) {
 	var_table->exitscope();
 }
 
+int method_class::get_temp_size() {
+	int ret = 0;
+	for ( int i = formals->first(); formals->more( i); i = formals->next( i))
+	{
+		ret = max( ret, formals->nth( i)->get_temp_size());
+	}
+	return ret;
+}
+
 void assign_class::code(ostream &s) {
 	expr->code( s);
 	lookup_var( name);
 	emit_store( source_reg, object_offset << 2, offset_base, s);
+}
+
+int assign_class::get_temp_size() {
+	return expr->get_temp_size();
 }
 
 void static_dispatch_class::code(ostream &s) {
@@ -1257,6 +1274,15 @@ void static_dispatch_class::code(ostream &s) {
 	emit_move( SELF, ACC, s);
 	emit_func_call( type_name, name, s);
 	emit_pop( SELF, s);
+}
+
+int static_dispatch_class::get_temp_size() {
+	int ret = expr->get_temp_size() + 1;
+	for ( int i = actual->first(); actual->more( i); i = actual->next( i))
+	{
+		ret = max( ret, actual->nth( i)->get_temp_size());
+	}
+	return ret;
 }
 
 void dispatch_class::code(ostream &s) {
@@ -1274,6 +1300,15 @@ void dispatch_class::code(ostream &s) {
 	emit_pop( SELF, s);
 }
 
+int dispatch_class::get_temp_size() {
+	int ret = expr->get_temp_size() + 1;
+	for ( int i = actual->first(); actual->more( i); i = actual->next( i))
+	{
+		ret = max( ret, actual->nth( i)->get_temp_size());
+	}
+	return ret;
+}
+
 void cond_class::code(ostream &s) {
 	int else_label = new_label();
 	int end_lable = new_label();
@@ -1285,6 +1320,11 @@ void cond_class::code(ostream &s) {
 	emit_label_def( else_label, s);
 	else_expr->code( s);
 	emit_label_def( end_label, s);
+}
+
+int cond_class::get_temp_size() {
+	return max( pred->get_temp_size(),
+			max( then_expr->get_temp_size(), else_expr->get_temp_size()));
 }
 
 void loop_class::code(ostream &s) {
@@ -1302,15 +1342,34 @@ void loop_class::code(ostream &s) {
 	emit_load_imm( ACC, 0, s);
 }
 
+int loop_class::get_temp_size() {
+	return max( pred->get_temp_size(), body->get_temp_size());
+}
+
 void typcase_class::code(ostream &s) {
+	expr->code();
+	emit_load( T0, TAG_OFFSET, ACC, s);
+}
+
+int typcase_class::get_temp_size() {
+	// Should be all of the branches.
+	return expr->get_temp_size();
 }
 
 void block_class::code(ostream &s) {
 	body->code( s);
 }
 
+int block_class::get_temp_size() {
+	return body->get_temp_size();
+}
+
 void let_class::code(ostream &s) {
 	init->code( s);
+}
+
+int let_class::get_temp_size() {
+	return max( init->get_temp_size(), body->get_temp_size() + 1);
 }
 
 #define ARITH_CODE( cmd, s)\
@@ -1347,16 +1406,32 @@ void plus_class::code(ostream &s) {
 	ARITH_CODE( add, s);
 }
 
+int plus_class::get_temp_size() {
+	return max( e1->get_temp_size(), e2->get_temp_size() + 1);
+}
+
 void sub_class::code(ostream &s) {
 	ARITH_CODE( sub, s);
+}
+
+int sub_class::get_temp_size() {
+	return max( e1->get_temp_size(), e2->get_temp_size() + 1);
 }
 
 void mul_class::code(ostream &s) {
 	ARITH_CODE( mul, s);
 }
 
+int mul_class::get_temp_size() {
+	return max( e1->get_temp_size(), e2->get_temp_size() + 1);
+}
+
 void divide_class::code(ostream &s) {
 	ARITH_CODE( div, s);
+}
+
+int divide_class::get_temp_size() {
+	return max( e1->get_temp_size(), e2->get_temp_size() + 1);
 }
 
 void neg_class::code(ostream &s) {
@@ -1373,6 +1448,10 @@ void neg_class::code(ostream &s) {
 	expr_is_const = 0;
 }
 
+int neg_class::get_temp_size() {
+	return e1->get_temp_size();
+}
+
 void lt_class::code(ostream &s) {
 	e1->code( s);
 	emit_push( S1, s);
@@ -1383,7 +1462,15 @@ void lt_class::code(ostream &s) {
 	emit_pop( S1, s);
 }
 
+int lt_class::get_temp_size() {
+	return max( e1->get_temp_size(), e2->get_temp_size() + 1);
+}
+
 void eq_class::code(ostream &s) {
+}
+
+int eq_class::get_temp_size() {
+	return 0;
 }
 
 void leq_class::code(ostream &s) {
@@ -1397,9 +1484,17 @@ void leq_class::code(ostream &s) {
 	emit_pop( S1, s);
 }
 
+int leq_class::get_temp_size() {
+	return max( e1->get_temp_size(), e2->get_temp_size() + 1);
+}
+
 void comp_class::code(ostream &s) {
 	e1->code( s);
 	emit_not( ACC, ACC, s);
+}
+
+int comp_class::get_temp_size() {
+	return e1->get_temp_size();
 }
 
 void int_const_class::code(ostream& s)
@@ -1411,14 +1506,26 @@ void int_const_class::code(ostream& s)
   expr_is_const = 1;
 }
 
+int int_const_class::get_temp_size() {
+	return 0;
+}
+
 void string_const_class::code(ostream& s)
 {
   emit_load_string(ACC,stringtable.lookup_string(token->get_string()),s);
 }
 
+int string_const_class::get_temp_size() {
+	return 0;
+}
+
 void bool_const_class::code(ostream& s)
 {
 	emit_load_imm( ACC, val, s);
+}
+
+int bool_const_class::get_temp_size() {
+	return 0;
 }
 
 void new__class::code(ostream &s) {
@@ -1448,6 +1555,10 @@ void new__class::code(ostream &s) {
 	}
 }
 
+int new__class::get_temp_size() {
+	return 0;
+}
+
 void isvoid_class::code(ostream &s) {
 	e1->code( s);
 
@@ -1466,12 +1577,24 @@ void isvoid_class::code(ostream &s) {
 	*/
 }
 
+int isvoid_class::get_temp_size() {
+	return e1->get_temp_size();
+}
+
 void no_expr_class::code(ostream &s) {
 	emit_load_imm( ACC, 0, s);
+}
+
+int no_expr_class::get_temp_size() {
+	return 0;
 }
 
 void object_class::code(ostream &s) {
 	lookup_var( name);
 	emit_addiu( ACC, offset_base, object_offset << 2, s);
+}
+
+int object_class::get_temp_size() {
+	return 0;
 }
 
