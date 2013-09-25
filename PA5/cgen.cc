@@ -1103,7 +1103,7 @@ void CgenNode::code_prototype( ostream &str)
 void CgenNode::code_initializer( ostream &str)
 {
 	emit_init_ref( get_name(), str); str << LABEL;
-	emit_func_call_before( str);
+	emit_func_call_before( 0, str);
 
 	if ( get_name() != Object)
 	{
@@ -1119,7 +1119,7 @@ void CgenNode::code_initializer( ostream &str)
 		}
 	}
 
-	emit_func_call_after( str);
+	emit_func_call_after( 0, str);
 }
 
 void CgenNode::code_class_methods( ostream &str)
@@ -1128,6 +1128,7 @@ void CgenNode::code_class_methods( ostream &str)
 	{
 		if ( features->nth( i)->is_method())
 		{
+			emit_method_ref( get_name(), "", s);
 			::var_table = &( this->member_offset_table);
 			features->nth( i)->code( str);
 		}
@@ -1222,7 +1223,9 @@ void attr_class::code( ostream &s) {
 void method_class::code( ostream &s) {
 	var_table->enterscope();
 
-	emit_func_call_before();
+	s << name << LABEL << endl;
+
+	emit_func_call_before( 0, s);
 
 	int cnt = 0;
 	for ( int i = formals->first(); formals->more( i); i = formals->next( i))
@@ -1232,7 +1235,7 @@ void method_class::code( ostream &s) {
 	}
 	body->code( s);
 
-	emit_func_call_after();
+	emit_func_call_after( 0, s);
 
 	var_table->exitscope();
 }
