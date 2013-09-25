@@ -1102,24 +1102,33 @@ void CgenNode::code_prototype( ostream &str)
 
 void CgenNode::code_initializer( ostream &str)
 {
+	int cnt = 0;
+	for ( int i = features->first(); features->more( i); i = features->next( i))
+	{
+		if ( !features->nth( i)->is_method())
+		{
+			cnt = max( features->nth( i)->get_temp_size(), cnt)
+		}
+	}
+
 	emit_init_ref( get_name(), str); str << LABEL;
-	emit_func_call_before( 0, str);
+	emit_func_call_before( cnt, str);
 
 	if ( get_name() != Object)
 	{
 		str << JAL; emit_init_ref( parentnd->get_name(), str);
+	}
 
-		for ( int i = features->first(); features->more( i); i = features->next( i))
+	for ( int i = features->first(); features->more( i); i = features->next( i))
+	{
+		if ( !features->nth( i)->is_method())
 		{
-			if ( !features->nth( i)->is_method())
-			{
-				::var_table = &( this->member_offset_table);
-				features->nth( i)->code( str);
-			}
+			::var_table = &( this->member_offset_table);
+			features->nth( i)->code( str);
 		}
 	}
 
-	emit_func_call_after( 0, str);
+	emit_func_call_after( cnt, str);
 }
 
 void CgenNode::code_class_methods( ostream &str)

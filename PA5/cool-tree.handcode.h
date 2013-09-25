@@ -70,12 +70,14 @@ void dump_with_types(ostream&,int);
 
 #define Feature_EXTRAS                                        \
 virtual void dump_with_types(ostream&,int) = 0; 	      \
-virtual void code( ostream &s) = 0;
+virtual void code( ostream &s) = 0; 			      \
+virtual void get_temp_size() = 0;
 
 
 #define Feature_SHARED_EXTRAS                                       \
 void dump_with_types(ostream&,int); 				    \
-void code( ostream &s);
+void code( ostream &s); 					    \
+void get_temp_size();
 
 
 #define Formal_EXTRAS                              \
