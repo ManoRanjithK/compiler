@@ -1542,7 +1542,7 @@ void new__class::code(ostream &s) {
 	{
 		// Calcu address
 		emit_load( T0, TAG_OFFSET, SELF, s);
-		emit_sll( T0, T0, 1, s);
+		emit_sll( T0, T0, 3, s);
 
 		emit_push( S1, s);
 		emit_load_address( S1, CLASSOBJTAB, s);
@@ -1565,7 +1565,7 @@ void new__class::code(ostream &s) {
 }
 
 int new__class::get_temp_size() {
-	return 0;
+	return 1;
 }
 
 void isvoid_class::code(ostream &s) {
