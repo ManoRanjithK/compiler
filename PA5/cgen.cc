@@ -117,6 +117,7 @@ BoolConst falsebool(FALSE);
 BoolConst truebool(TRUE);
 
 CgenClassTableP global_table = NULL;
+CgenNodeP global_node = NULL;
 
 //*********************************************************
 //
@@ -1109,6 +1110,7 @@ void CgenNode::code_prototype( ostream &str)
 
 void CgenNode::code_initializer( ostream &str)
 {
+	global_node = this;
 	int cnt = 0;
 	for ( int i = features->first(); features->more( i); i = features->next( i))
 	{
@@ -1140,6 +1142,7 @@ void CgenNode::code_initializer( ostream &str)
 
 void CgenNode::code_class_methods( ostream &str)
 {
+	global_node = this;
 	for ( int i = features->first(); features->more( i); i = features->next( i))
 	{
 		if ( features->nth( i)->is_method())
@@ -1241,21 +1244,23 @@ int attr_class::get_temp_size() {
 }
 
 void method_class::code( ostream &s) {
+	init_alloc_temp();
+	int temps = get_temp_size();
 	method_var_table->enterscope();
 
 	s << name << LABEL << endl;
 
-	emit_func_call_before( 0, s);
+	emit_func_call_before( temps, s);
 
 	int cnt = DEFAULT_OBJFIELDS;
 	for ( int i = formals->first(); formals->more( i); i = formals->next( i))
 	{
-		// should use a get_name method here.
+		// TODO: should use a get_name method here.
 		method_var_table->addid( formals->nth( i)->name, ( void *)( cnt++));
 	}
 	body->code( s);
 
-	emit_func_call_after( 0, s);
+	emit_func_call_after( temps, s);
 
 	method_var_table->exitscope();
 }
@@ -1355,7 +1360,7 @@ void loop_class::code(ostream &s) {
 	emit_label_def( end_label, s);
 
 	// Return void dear.
-	emit_load_imm( ACC, 0, s);
+	emit_move( ACC, ZERO, s);
 }
 
 int loop_class::get_temp_size() {
@@ -1364,12 +1369,53 @@ int loop_class::get_temp_size() {
 
 void typcase_class::code(ostream &s) {
 	expr->code();
-	emit_load( T0, TAG_OFFSET, ACC, s);
+	emit_load( ACC, TAG_OFFSET, ACC, s);
+
+	int last_label = new_label();
+	emit_bne( ACC, ZERO, last_label, s);
+	emit_load_string( ACC, stringtable.lookup_string( global_node->filename->get_string()), s);
+	emit_jal( CASEABORT2, s);
+
+	clear_vec();
+	for ( int i( cases->first()); cases->more( i); i = cases->next( i))
+	{
+		// TODO: should use a get_type here.
+		Symbol type = cases->nth( i)->type_decl;
+
+		CgenNodeP class_node = global_table->lookup( type);
+		push_vec( class_node->get_class_tag(),class_node->get_max_class_tag(), i);
+	}
+
+	sort_vec();
+
+	int temp = alloc_temp();
+
+	int x, y, c, cur_label, next_label = new_label();
+	for ( init_vec(); next_vec(); fetch_vec( x, y, c),
+			cur_label = next_label, next_label = new_label())
+	{
+		emit_label_def( cur_lable, s);
+		emit_blti( ACC, x, next_label, s);
+		emit_bgti( ACC, y, next_label, s);
+
+		Cases_class cases = cases->nth( c);
+		// TODO: lots of getters.
+		method_var_table->enterscope();
+		method_var_table->addid( cases->name, ( void *)( temp + DEFAULT_OBJFIELDS)));
+		cases->expr->code( s);
+		method_var_table->exitscope();
+		emit_branch( last_label, s);
+	}
+
+	emit_label_def( next_label, s);
+	emit_jal( CASEABORT, s);
+
+	emit_label_def( last_label, s);
 }
 
 int typcase_class::get_temp_size() {
-	// Should be all of the branches.
-	return expr->get_temp_size();
+	// TODO: should be all of the branches.
+	return expr->get_temp_size() + 1;
 }
 
 void block_class::code(ostream &s) {

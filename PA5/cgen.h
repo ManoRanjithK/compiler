@@ -95,6 +95,9 @@ public:
    CgenNodeP get_parentnd() { return parentnd; }
    int basic() { return (basic_status == Basic); }
 
+   int get_class_tag() const { return class_tag;}
+   int get_max_class_tag() const { return get_max_class_tag;}
+
    void walk_down();
 
    void code_prototype( ostream &str);

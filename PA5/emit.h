@@ -120,3 +120,6 @@
 #define S5    "s5"
 #define S6    "s6"
 static const char *reg_S[] = { SELF, S1, S2, S3, S4, S5, S6};
+
+#define CASEABORT "_case_abort"
+#define CASEABORT2 "_case_abort2"

@@ -70,7 +70,7 @@ int new_label()
 	return lable_count++;
 }
 
-static int temp_offset;
+static int temp_offset = 0;
 int init_alloc_temp()
 {
 	temp_offset = 0;
@@ -79,4 +79,43 @@ int init_alloc_temp()
 int alloc_temp()
 {
 	return temp_offset++;
+}
+
+#include <vector>
+#include <utilities>
+#include <algorithm>
+
+static std::vector< std::pair< std::pair< int, int>, int> > vec;
+static std::vector< std::pair< std::pair< int, int>, int> >::iterator vec_leg;
+void clear_vec()
+{
+	vec.clear();
+}
+
+void push_vec( int x, int y, int c)
+{
+	vec.push_back( std::make_pair( std::make_pair( x, y), c));
+}
+
+void sort_vec()
+{
+	sort( vec.begin(), vec.end());
+}
+
+void init_vec()
+{
+	vec_leg = vec.begin();
+}
+
+bool next_vec()
+{
+	return vec_leg != vec.end();
+}
+
+void fetch_vec( int &x, int &y, int &c)
+{
+	x = vec_leg->first->first;
+	y = vec_leg->first->second;
+	c = vec_leg->second;
+	vec_leg++;
 }
