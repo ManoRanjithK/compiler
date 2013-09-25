@@ -362,23 +362,25 @@ static void emit_gc_check(char *source, ostream &s)
   s << JAL << "_gc_check" << endl;
 }
 
-static void emit_func_call_before( ostream &s)
+static void emit_func_call_before( int temp_size, ostream &s)
 {
-	emit_addiu( SP, SP, -12, s);
-	emit_store( FP, 12, SP, s);
-	emit_store( SELF, 8, SP, s);
-	emit_store( RA, 4, SP, s);
+	emit_store( FP, 0, SP, s);
+	emit_store( SELF, 4, SP, s);
+	emit_store( RA, 8, SP, s);
+	emit_addiu( SP, SP, -12 - temp_size, s);
 	emit_addiu( FP, SP, 4, s);
 	emit_move( SELF, ACC, s);
 }
 
-static void emit_func_call_after( ostream &s)
+static void emit_func_call_after( int temp_size, ostream &s)
 {
 	emit_move( ACC, SELF, s);
-	emit_load( RA, 4, SP, s);
-	emit_load( SELF, 8, SP, s);
-	emit_load( FP, 12, SP, s);
-	emit_addiu( SP, SP, 12, s);
+	emit_addiu( SP, SP, 12 + temp_size, s);
+	emit_load( RA, 0, SP, s);
+	emit_load( SELF, 4, SP, s);
+	emit_load( FP, 8, SP, s);
+
+	emit_return( s);
 }
 
 static void emit_new( Symbol name, ostream &s)
@@ -397,7 +399,15 @@ static void lookup_var( Symbol name)
 	if ( !object_offset)
 	{
 		object_offset = ( int) ( var_table->lookup( name));
-		offset_base = SELF;
+		if ( object_offset < 0)
+		{
+			offset_base = reg_S[-object_offset];
+			object_offset = 0;
+		}
+		else
+		{
+			offset_base = SELF;
+		}
 	}
 	else
 	{
@@ -1093,12 +1103,11 @@ void CgenNode::code_prototype( ostream &str)
 void CgenNode::code_initializer( ostream &str)
 {
 	emit_init_ref( get_name(), str); str << LABEL;
+	emit_func_call_before( str);
 
 	if ( get_name() != Object)
 	{
-		emit_func_call_before( str);
 		str << JAL; emit_init_ref( parentnd->get_name(), str);
-		emit_func_call_after( str);
 
 		for ( int i = features->first(); features->more( i); i = features->next( i))
 		{
@@ -1110,7 +1119,7 @@ void CgenNode::code_initializer( ostream &str)
 		}
 	}
 
-	emit_return( str);
+	emit_func_call_after( str);
 }
 
 void CgenNode::code_class_methods( ostream &str)
@@ -1213,6 +1222,8 @@ void attr_class::code( ostream &s) {
 void method_class::code( ostream &s) {
 	var_table->enterscope();
 
+	emit_func_call_before();
+
 	int cnt = 0;
 	for ( int i = formals->first(); formals->more( i); i = formals->next( i))
 	{
@@ -1221,44 +1232,91 @@ void method_class::code( ostream &s) {
 	}
 	body->code( s);
 
+	emit_func_call_after();
+
 	var_table->exitscope();
 }
 
 void assign_class::code(ostream &s) {
-	expr->code();
+	expr->code( s);
 	lookup_var( name);
 	emit_store( source_reg, object_offset << 2, offset_base, s);
 }
 
 void static_dispatch_class::code(ostream &s) {
+	for ( int i = actual->first(); actual->more( i); i = actual->next( i))
+	{
+		actual->nth( i)->code( s);
+		emit_push( ACC, s);
+	}
+	expr->code( s);
+	emit_push( SELF, s);
+	emit_move( SELF, ACC, s);
+	emit_func_call( type_name, name, s);
+	emit_pop( SELF, s);
 }
 
 void dispatch_class::code(ostream &s) {
+	Symbol type_name = expr->get_type();
+
+	for ( int i = actual->first(); actual->more( i); i = actual->next( i))
+	{
+		actual->nth( i)->code( s);
+		emit_push( ACC, s);
+	}
+	expr->code( s);
+	emit_push( SELF, s);
+	emit_move( SELF, ACC, s);
+	emit_func_call( type_name, name, s);
+	emit_pop( SELF, s);
 }
 
 void cond_class::code(ostream &s) {
+	int else_label = new_label();
+	int end_lable = new_label();
+
+	pred->code( s);
+	emit_beqz( ACC, else_label, s);
+	then_expr->code( s);
+	emit_branch( end_label, s);
+	emit_label_def( else_label, s);
+	else_expr->code( s);
+	emit_label_def( end_label, s);
 }
 
 void loop_class::code(ostream &s) {
+	int cond_label = new_label();
+	int end_label = new_label();
+
+	emit_label_def( cond_label, s);
+	pred->code( s);
+	emit_beqz( ACC, end_label, s);
+	body->code( s);
+	emit_branch( cond_label, s);
+	emit_label_def( end_label, s);
+
+	// Return void dear.
+	emit_load_imm( ACC, 0, s);
 }
 
 void typcase_class::code(ostream &s) {
 }
 
 void block_class::code(ostream &s) {
-	body->code();
+	body->code( s);
 }
 
 void let_class::code(ostream &s) {
+	init->code( s);
 }
 
 #define ARITH_CODE( cmd, s)\
 {\
-	e1->code();\
+	e1->code( s);\
 	int e1_is_const = expr_is_const;\
 	emit_push( S1, s);\
 	emit_move( S1, ACC, s);\
-	e2->code();\
+	e2->code( s);\
 	int e2_is_const = expr_is_const;\
 	emit_move( T0, ACC, s);\
 	if ( e2_is_const)\
@@ -1299,7 +1357,7 @@ void divide_class::code(ostream &s) {
 }
 
 void neg_class::code(ostream &s) {
-	e1->code();
+	e1->code( s);
 	emit_fetch_int( T0, ACC, s);
 	emit_neg( T0, T0, s);
 	if ( expr_is_const)
@@ -1313,10 +1371,10 @@ void neg_class::code(ostream &s) {
 }
 
 void lt_class::code(ostream &s) {
-	e1->code();
+	e1->code( s);
 	emit_push( S1, s);
 	emit_fetch_int( S1, ACC, s);
-	e2->code();
+	e2->code( s);
 	emit_fetch_int( ACC, ACC, s);
 	emit_slt( ACC, S1, ACC, s);
 	emit_pop( S1, s);
@@ -1326,10 +1384,10 @@ void eq_class::code(ostream &s) {
 }
 
 void leq_class::code(ostream &s) {
-	e1->code();
+	e1->code( s);
 	emit_push( S1, s);
 	emit_fetch_int( S1, ACC, s);
-	e2->code();
+	e2->code( s);
 	emit_fetch_int( ACC, ACC, s);
 	emit_slt( ACC, ACC, S1, s);
 	emit_not( ACC, ACC, s);
@@ -1337,6 +1395,8 @@ void leq_class::code(ostream &s) {
 }
 
 void comp_class::code(ostream &s) {
+	e1->code( s);
+	emit_not( ACC, ACC, s);
 }
 
 void int_const_class::code(ostream& s)
@@ -1386,7 +1446,7 @@ void new__class::code(ostream &s) {
 }
 
 void isvoid_class::code(ostream &s) {
-	e1->code();
+	e1->code( s);
 
 	emit_not( ACC, ACC, s);
 	/*
@@ -1411,5 +1471,4 @@ void object_class::code(ostream &s) {
 	lookup_var( name);
 	emit_addiu( ACC, offset_base, object_offset << 2, s);
 }
-
 

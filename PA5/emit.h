@@ -115,3 +115,8 @@
 
 #define S1    "s1"
 #define S2    "s2"
+#define S2    "s3"
+#define S4    "s4"
+#define S5    "s5"
+#define S6    "s6"
+static const char *reg_S[] = { SELF, S1, S2, S3, S4, S5, S6};
