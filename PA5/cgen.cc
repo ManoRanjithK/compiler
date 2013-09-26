@@ -1670,8 +1670,15 @@ void new__class::code(ostream &s) {
 	}
 	else
 	{
-		emit_new( type_name);
-		s << JAL; emit_init_ref( type_name, s);
+		if ( type_name != Bool)
+		{
+			emit_new( type_name, s);
+			s << JAL; emit_init_ref( type_name, s);
+		}
+		else
+		{
+			emit_load_bool( ACC, falsebool, s);
+		}
 	}
 }
 
