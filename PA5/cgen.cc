@@ -392,28 +392,28 @@ static void emit_new( Symbol name, ostream &s)
 
 int expr_is_const = 0;
 int object_offset = 0;
-char *offset_base = NULL;
+char *object_base_reg = NULL;
 
 static void lookup_var( Symbol name)
 {
-	object_offset = ( int) ( method_var_table->lookup( name));
+	object_offset = ( int) ( ::method_var_table->lookup( name));
 	if ( !object_offset)
 	{
-		object_offset = ( int) ( var_table->lookup( name));
+		object_offset = ( int) ( ::var_table->lookup( name));
 		if ( object_offset < 0)
 		{
-			offset_base = reg_S[-object_offset];
+			object_base_reg = reg_S[-object_offset];
 			object_offset = 0;
 		}
 		else
 		{
-			offset_base = SELF;
+			object_base_reg = SELF;
 		}
 	}
 	else
 	{
 		object_offset -= DEFAULT_OBJFIELDS;
-		offset_base = FP;
+		object_base_reg = FP;
 	}
 }
 
@@ -1036,7 +1036,7 @@ void CgenNode::walk_down()
 	for ( List<CgenNode> *leg = children; leg; leg = leg->tl())
 	{
 		leg->hd()->walk_down();
-		max_class_tag = max( max_class_tag, leg->hd()->class_tag);
+		max_class_tag = max( max_class_tag, leg->hd()->max_class_tag);
 	}
 }
 
@@ -1065,12 +1065,6 @@ void CgenNode::code_classobjentry( ostream &str)
 
 void CgenNode::code_prototype( ostream &str)
 {
-	// Basic classes are coded into constants section.
-	if ( basic() == Basic)
-	{
-		return;
-	}
-
 	str << WORD << "-1" << endl;
 	emit_protobj_ref( get_name(), str); str << LABEL
 		<< WORD << class_tag << endl
@@ -1084,6 +1078,9 @@ void CgenNode::code_prototype( ostream &str)
 		{
 			switch ( leg->hd()->class_tag)
 			{
+				case 0:
+					// Object member.
+					break;
 				case 1:
 					// IO member.
 					break;
@@ -1128,14 +1125,15 @@ void CgenNode::code_initializer( ostream &str)
 		str << JAL; emit_init_ref( parentnd->get_name(), str);
 	}
 
+	::var_table = &( this->member_offset_table);
 	for ( int i = features->first(); features->more( i); i = features->next( i))
 	{
 		if ( !features->nth( i)->is_method())
 		{
-			::var_table = &( this->member_offset_table);
 			features->nth( i)->code( str);
 		}
 	}
+	::var_table = NULL;
 
 	emit_func_call_after( cnt, str);
 }
@@ -1143,15 +1141,16 @@ void CgenNode::code_initializer( ostream &str)
 void CgenNode::code_class_methods( ostream &str)
 {
 	global_node = this;
+	::var_table = &( this->member_offset_table);
 	for ( int i = features->first(); features->more( i); i = features->next( i))
 	{
 		if ( features->nth( i)->is_method())
 		{
 			emit_method_ref( get_name(), "", s);
-			::var_table = &( this->member_offset_table);
 			features->nth( i)->code( str);
 		}
 	}
+	::var_table = NULL;
 }
 
 void CgenClassTable::code()
@@ -1219,7 +1218,7 @@ CgenNode::CgenNode(Class_ nd, Basicness bstatus, CgenClassTableP ct) :
    object_size( 0),
    dispatch_table_size( 0)
 {
-   class_name_entry = stringtable.add_string(name->get_string());          // Add class name to string table
+   class_name_entry = stringtable.lookup(name->get_string());          // Add class name to string table
 }
 
 
@@ -1235,7 +1234,7 @@ CgenNode::CgenNode(Class_ nd, Basicness bstatus, CgenClassTableP ct) :
 
 void attr_class::code( ostream &s) {
 	init->code( s);
-	int offset = ( int)( var_table->lookup( get_name()));
+	int offset = ( int)( ::var_table->lookup( get_name()));
 	emit_store( ACC, offset << 2, SELF, str);
 }
 
@@ -1266,18 +1265,13 @@ void method_class::code( ostream &s) {
 }
 
 int method_class::get_temp_size() {
-	int ret = 0;
-	for ( int i = formals->first(); formals->more( i); i = formals->next( i))
-	{
-		ret = max( ret, formals->nth( i)->get_temp_size());
-	}
-	return ret;
+	return formals->len() + body->get_temp_size();
 }
 
 void assign_class::code(ostream &s) {
 	expr->code( s);
 	lookup_var( name);
-	emit_store( source_reg, object_offset << 2, offset_base, s);
+	emit_store( source_reg, object_offset << 2, object_base_reg, s);
 }
 
 int assign_class::get_temp_size() {
@@ -1291,14 +1285,11 @@ void static_dispatch_class::code(ostream &s) {
 		emit_push( ACC, s);
 	}
 	expr->code( s);
-	emit_push( SELF, s);
-	emit_move( SELF, ACC, s);
 	emit_func_call( type_name, name, s);
-	emit_pop( SELF, s);
 }
 
 int static_dispatch_class::get_temp_size() {
-	int ret = expr->get_temp_size() + 1;
+	int ret = expr->get_temp_size();
 	for ( int i = actual->first(); actual->more( i); i = actual->next( i))
 	{
 		ret = max( ret, actual->nth( i)->get_temp_size());
@@ -1315,14 +1306,11 @@ void dispatch_class::code(ostream &s) {
 		emit_push( ACC, s);
 	}
 	expr->code( s);
-	emit_push( SELF, s);
-	emit_move( SELF, ACC, s);
 	emit_func_call( type_name, name, s);
-	emit_pop( SELF, s);
 }
 
 int dispatch_class::get_temp_size() {
-	int ret = expr->get_temp_size() + 1;
+	int ret = expr->get_temp_size();
 	for ( int i = actual->first(); actual->more( i); i = actual->next( i))
 	{
 		ret = max( ret, actual->nth( i)->get_temp_size());
@@ -1717,7 +1705,7 @@ int no_expr_class::get_temp_size() {
 
 void object_class::code(ostream &s) {
 	lookup_var( name);
-	emit_addiu( ACC, offset_base, object_offset << 2, s);
+	emit_addiu( ACC, object_base_reg, object_offset << 2, s);
 }
 
 int object_class::get_temp_size() {
