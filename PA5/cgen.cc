@@ -28,6 +28,21 @@
 extern void emit_string_constant(ostream& str, char *s);
 extern int cgen_debug;
 
+extern int new_label();
+extern void init_alloc_temp();
+extern int alloc_temp();
+extern void clear_vec();
+extern void push_vec( int x, int y, int c);
+extern void sort_vec();
+extern void init_vec();
+extern bool next_vec();
+extern void fetch_vec( int &x, int &y, int &c);
+
+static inline int max( int a, int b)
+{
+	return a < b ? b : a;
+}
+
 //
 // Three symbols from the semantic analyzer (semant.cc) are used.
 // If e : No_type, then no code is generated for e.
@@ -394,6 +409,10 @@ int expr_is_const = 0;
 int object_offset = 0;
 char *object_base_reg = NULL;
 
+SymbolTable< Symbol, void> global_method_var_table;
+SymbolTable< Symbol, void> *var_table;
+SymbolTable< Symbol, void> *method_var_table = &global_method_var_table;
+
 static void lookup_var( Symbol name)
 {
 	object_offset = ( int) ( ::method_var_table->lookup( name));
@@ -420,7 +439,7 @@ static void lookup_var( Symbol name)
 static void emit_func_call( Symbol class_name, Symbol method_name, ostream &s)
 {
 	CgenNodeP node = global_table->lookup( class_name);
-	int offset = ( ( int)( node->method_offset_table.lookup( method_name))) - DEFAULT_OBJFIELDS;
+	int offset = ( ( int)( node->lookup_method_offset( method_name))) - DEFAULT_OBJFIELDS;
 
 	emit_push( ACC, s);
 	emit_partial_load_address( ACC, s); emit_disptable_ref( class_name, s);
@@ -429,29 +448,24 @@ static void emit_func_call( Symbol class_name, Symbol method_name, ostream &s)
 	emit_pop( ACC, s);
 }
 
-static void emit_not( char *dest_reg, char *soruce_reg, ostream &s)
+static void emit_not( char *dest_reg, char *source_reg, ostream &s)
 {
 	s << NOT << dest_reg << " " << source_reg << endl;
 }
 
-static void emit_slt( char *dest_ret, char *src0_reg, char *src1_reg, ostream &s)
+static void emit_slt( char *dest_reg, char *src0_reg, char *src1_reg, ostream &s)
 {
 	s << SLT << dest_reg << " " << src0_reg << " " << src1_reg << endl;
 }
 
-static void emit_nor( char *dest_reg, char *soruce_reg, ostream &s)
+static void emit_nor( char *dest_reg, char *source_reg, ostream &s)
 {
 	s << NOR << dest_reg << " " << source_reg << endl;
 }
 
-static void emit_xor( char *dest_reg, char *soruce_reg, ostream &s)
+static void emit_xor( char *dest_reg, char *src0_reg, char *src1_reg, ostream &s)
 {
-	s << XOR << dest_reg << " " << source_reg << endl;
-}
-
-static void emit_sll( char *dest_reg, char *soruce_reg, int bits, ostream &s)
-{
-	s << SLL << dest_reg << " " << source_reg << << " " << bits << endl;
+	s << XOR << dest_reg << " " << src0_reg << " " << src1_reg << endl;
 }
 
 
@@ -759,9 +773,9 @@ CgenClassTable::CgenClassTable(Classes classes, ostream& s) : nds(NULL) , str(s)
    if (cgen_debug) cout << "Building CgenClassTable" << endl;
    install_basic_classes();
 
-   stringclasstag = lookup( Str)->class_tag;
-   intclasstag = lookup( Int)->class_tag;
-   boolclasstag = lookup( Bool)->class_tag;
+   stringclasstag = lookup( Str)->get_class_tag();
+   intclasstag = lookup( Int)->get_class_tag();
+   boolclasstag = lookup( Bool)->get_class_tag();
 
    install_classes(classes);
 
@@ -953,10 +967,6 @@ void CgenClassTable::set_relations(CgenNodeP nd)
 
 int CgenNode::class_count = 0;
 
-SymbolTable< Symbol, void> global_method_var_table;
-SymbolTable< Symbol, void> *var_table;
-SymbolTable< Symbol, void> *method_var_table = &global_method_var_table;
-
 void CgenNode::count_Features()
 {
 	for ( int i = features->first(); features->more( i); i = features->next( i))
@@ -1011,9 +1021,9 @@ void CgenNode::walk_down()
 		dispatch_table_size = parentnd->dispatch_table_size;
 		object_size = parentnd->object_size;
 
-		this->member_offset_table = p->member_offset_table;
-		this->method_offset_table = p->method_offset_table;
-		this->method_table = p->method_table;
+		this->member_offset_table = parentnd->member_offset_table;
+		this->method_offset_table = parentnd->method_offset_table;
+		this->method_table = parentnd->method_table;
 
 		class_method_list *inhe_methods = parentnd->method_list;
 		while ( inhe_methods)
@@ -1113,7 +1123,7 @@ void CgenNode::code_initializer( ostream &str)
 	{
 		if ( !features->nth( i)->is_method())
 		{
-			cnt = max( features->nth( i)->get_temp_size(), cnt)
+			cnt = max( features->nth( i)->get_temp_size(), cnt);
 		}
 	}
 
@@ -1146,7 +1156,6 @@ void CgenNode::code_class_methods( ostream &str)
 	{
 		if ( features->nth( i)->is_method())
 		{
-			emit_method_ref( get_name(), "", s);
 			features->nth( i)->code( str);
 		}
 	}
@@ -1214,11 +1223,12 @@ CgenNode::CgenNode(Class_ nd, Basicness bstatus, CgenClassTableP ct) :
    parentnd(NULL),
    children(NULL),
    basic_status(bstatus),
-   class_tag( class_count++),
    object_size( 0),
-   dispatch_table_size( 0)
+   dispatch_table_size( 0),
+   class_tag( class_count++),
+   max_class_tag( class_tag)
 {
-   class_name_entry = stringtable.lookup(name->get_string());          // Add class name to string table
+   class_name_entry = stringtable.lookup_string(name->get_string());          // Add class name to string table
 }
 
 
@@ -1235,7 +1245,7 @@ CgenNode::CgenNode(Class_ nd, Basicness bstatus, CgenClassTableP ct) :
 void attr_class::code( ostream &s) {
 	init->code( s);
 	int offset = ( int)( ::var_table->lookup( get_name()));
-	emit_store( ACC, offset << 2, SELF, str);
+	emit_store( ACC, offset << 2, SELF, s);
 }
 
 int attr_class::get_temp_size() {
@@ -1247,17 +1257,16 @@ void method_class::code( ostream &s) {
 	int temps = get_temp_size();
 	method_var_table->enterscope();
 
-	s << name << LABEL << endl;
+	emit_method_ref( global_node->get_name(), name, s);
 
 	emit_func_call_before( temps, s);
 
 	int cnt = DEFAULT_OBJFIELDS;
 	for ( int i = formals->first(); formals->more( i); i = formals->next( i))
 	{
-		// TODO: should use a get_name method here.
-		method_var_table->addid( formals->nth( i)->name, ( void *)( cnt++));
+		method_var_table->addid( formals->nth( i)->get_name(), ( void *)( cnt++));
 	}
-	body->code( s);
+	expr->code( s);
 
 	emit_func_call_after( temps, s);
 
@@ -1265,13 +1274,13 @@ void method_class::code( ostream &s) {
 }
 
 int method_class::get_temp_size() {
-	return formals->len() + body->get_temp_size();
+	return formals->len() + expr->get_temp_size();
 }
 
 void assign_class::code(ostream &s) {
 	expr->code( s);
 	lookup_var( name);
-	emit_store( source_reg, object_offset << 2, object_base_reg, s);
+	emit_store( ACC, object_offset << 2, object_base_reg, s);
 }
 
 int assign_class::get_temp_size() {
@@ -1320,21 +1329,21 @@ int dispatch_class::get_temp_size() {
 
 void cond_class::code(ostream &s) {
 	int else_label = new_label();
-	int end_lable = new_label();
+	int end_label = new_label();
 
 	pred->code( s);
 	emit_load_bool( T0, falsebool, s);
 	emit_beq( ACC, T0, else_label, s);
-	then_expr->code( s);
+	then_exp->code( s);
 	emit_branch( end_label, s);
 	emit_label_def( else_label, s);
-	else_expr->code( s);
+	else_exp->code( s);
 	emit_label_def( end_label, s);
 }
 
 int cond_class::get_temp_size() {
 	return max( pred->get_temp_size(),
-			max( then_expr->get_temp_size(), else_expr->get_temp_size()));
+			max( then_exp->get_temp_size(), else_exp->get_temp_size()));
 }
 
 void loop_class::code(ostream &s) {
@@ -1344,7 +1353,7 @@ void loop_class::code(ostream &s) {
 	emit_label_def( cond_label, s);
 	pred->code( s);
 	emit_load_bool( T0, falsebool, s);
-	emit_beq( ACC, T0, else_label, s);
+	emit_beq( ACC, T0, end_label, s);
 	body->code( s);
 	emit_branch( cond_label, s);
 	emit_label_def( end_label, s);
@@ -1370,7 +1379,7 @@ void typcase_class::code(ostream &s) {
 	for ( int i( cases->first()); cases->more( i); i = cases->next( i))
 	{
 		// TODO: should use a get_type here.
-		Symbol type = cases->nth( i)->type_decl;
+		Symbol type = cases->nth( i)->get_type_decl();
 
 		CgenNodeP class_node = global_table->lookup( type);
 		push_vec( class_node->get_class_tag(), class_node->get_max_class_tag(), i);
@@ -1385,15 +1394,14 @@ void typcase_class::code(ostream &s) {
 	for ( init_vec(); next_vec(); fetch_vec( x, y, c),
 			cur_label = next_label, next_label = new_label())
 	{
-		emit_label_def( cur_lable, s);
+		emit_label_def( cur_label, s);
 		emit_blti( ACC, x, next_label, s);
 		emit_bgti( ACC, y, next_label, s);
 
-		Cases_class cases = cases->nth( c);
-		// TODO: lots of getters.
+		Case br = cases->nth( c);
 		method_var_table->enterscope();
-		method_var_table->addid( cases->name, ( void *)( temp + DEFAULT_OBJFIELDS)));
-		cases->expr->code( s);
+		method_var_table->addid( br->get_name(), ( void *)( temp + DEFAULT_OBJFIELDS));
+		br->get_expr()->code( s);
 		method_var_table->exitscope();
 		emit_branch( last_label, s);
 	}
@@ -1408,18 +1416,26 @@ int typcase_class::get_temp_size() {
 	int cnt = expr->get_temp_size();
 	for ( int i( cases->first()); cases->more( i); i = cases->next( i))
 	{
-		cnt = max( cnt, cases->nth( i)->expr->get_temp_size() + 1);
+		cnt = max( cnt, cases->nth( i)->get_expr()->get_temp_size() + 1);
 	}
 
 	return cnt;
 }
 
 void block_class::code(ostream &s) {
-	body->code( s);
+	for ( int i( body->first()); body->more( i); i = body->next( i))
+	{
+		body->nth( i)->code( s);
+	}
 }
 
 int block_class::get_temp_size() {
-	return body->get_temp_size();
+	int ret = 0;
+	for ( int i( body->first()); body->more( i); i = body->next( i))
+	{
+		ret = max( ret, body->nth( i)->get_temp_size());
+	}
+	return ret;
 }
 
 void let_class::code(ostream &s) {
@@ -1462,7 +1478,7 @@ int let_class::get_temp_size() {
 	emit_fetch_int( T0, T0, s);\
 	emit_##cmd( T0, S1, T0, s);\
 	emit_store_int( T0, ACC, s);\
-	emit_pop( S1);\
+	emit_pop( S1, s);\
 	expr_is_const = 0;\
 }
 
@@ -1508,7 +1524,7 @@ void neg_class::code(ostream &s) {
 		emit_new( Int, s);
 		emit_pop( T0, s);
 	}
-	emit_sotre_int( T0, ACC, s);
+	emit_store_int( T0, ACC, s);
 	expr_is_const = 0;
 }
 
@@ -1525,9 +1541,9 @@ void lt_class::code(ostream &s) {
 
 	int end_label = new_label();
 	emit_load_bool( ACC, truebool, s);
-	emit_blt( S1, T0, end_lable, s);
+	emit_blt( S1, T0, end_label, s);
 	emit_load_bool( ACC, falsebool, s);
-	emit_label_def( end_lable, s);
+	emit_label_def( end_label, s);
 	emit_pop( S1, s);
 }
 
@@ -1649,7 +1665,7 @@ int bool_const_class::get_temp_size() {
 }
 
 void new__class::code(ostream &s) {
-	if ( type_name = SELF_TYPE)
+	if ( type_name == SELF_TYPE)
 	{
 		// Calcu address
 		emit_load( T0, TAG_OFFSET, SELF, s);
@@ -1661,7 +1677,7 @@ void new__class::code(ostream &s) {
 
 		// Call copy.
 		emit_load( ACC, 0, S1, s);
-		s << JAL; emit_method_ref( Object, copy, s);
+		s << JAL; emit_method_ref( ::Object, ::copy, s);
 
 		// Run init.
 		emit_load( ACC, 4, S1, s);

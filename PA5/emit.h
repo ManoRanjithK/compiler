@@ -111,15 +111,15 @@
 #define SLT   "\tslt\n"
 #define NOR   "\tnor\n"
 #define XOR   "\txor\n"
-#define SLL   "\tsll\n"
 
+#define T0    "t0"
 #define S1    "s1"
 #define S2    "s2"
-#define S2    "s3"
+#define S3    "s3"
 #define S4    "s4"
 #define S5    "s5"
 #define S6    "s6"
-static const char *reg_S[] = { SELF, S1, S2, S3, S4, S5, S6};
+static char *reg_S[] = { SELF, S1, S2, S3, S4, S5, S6};
 
 #define CASEABORT "_case_abort"
 #define CASEABORT2 "_case_abort2"

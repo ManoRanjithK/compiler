@@ -67,11 +67,11 @@ void emit_string_constant(ostream& str, char* s)
 int new_label()
 {
 	static int label_count = 0;
-	return lable_count++;
+	return label_count++;
 }
 
 static int temp_offset = 0;
-int init_alloc_temp()
+void init_alloc_temp()
 {
 	temp_offset = 0;
 }
@@ -82,7 +82,7 @@ int alloc_temp()
 }
 
 #include <vector>
-#include <utilities>
+#include <utility>
 #include <algorithm>
 
 static std::vector< std::pair< std::pair< int, int>, int> > vec;
@@ -114,8 +114,8 @@ bool next_vec()
 
 void fetch_vec( int &x, int &y, int &c)
 {
-	x = vec_leg->first->first;
-	y = vec_leg->first->second;
+	x = vec_leg->first.first;
+	y = vec_leg->first.second;
 	c = vec_leg->second;
 	vec_leg++;
 }

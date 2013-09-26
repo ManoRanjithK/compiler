@@ -69,7 +69,7 @@ private:
                                               // `NotBasic' otherwise
    SymbolTable< Symbol, void> member_offset_table;
    SymbolTable< Symbol, void> method_offset_table;
-   SymbolTable< Symbol, Symbol> method_table;
+   SymbolTable< Symbol, Entry> method_table;
 
    int object_size;
    class_method_list *method_list;
@@ -96,7 +96,7 @@ public:
    int basic() { return (basic_status == Basic); }
 
    int get_class_tag() const { return class_tag;}
-   int get_max_class_tag() const { return get_max_class_tag;}
+   int get_max_class_tag() const { return max_class_tag;}
 
    void walk_down();
 
@@ -108,6 +108,8 @@ public:
    void code_class_methods( ostream &str);
 
    static void set_class_count( int count) { CgenNode::class_count = count;}
+
+   int lookup_method_offset( Symbol name) { return ( int) method_offset_table.lookup( name);}
 };
 
 class BoolConst
