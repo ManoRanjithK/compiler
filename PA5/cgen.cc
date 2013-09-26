@@ -1323,7 +1323,8 @@ void cond_class::code(ostream &s) {
 	int end_lable = new_label();
 
 	pred->code( s);
-	emit_beqz( ACC, else_label, s);
+	emit_load_bool( T0, falsebool, s);
+	emit_beq( ACC, T0, else_label, s);
 	then_expr->code( s);
 	emit_branch( end_label, s);
 	emit_label_def( else_label, s);
@@ -1342,7 +1343,8 @@ void loop_class::code(ostream &s) {
 
 	emit_label_def( cond_label, s);
 	pred->code( s);
-	emit_beqz( ACC, end_label, s);
+	emit_load_bool( T0, falsebool, s);
+	emit_beq( ACC, T0, else_label, s);
 	body->code( s);
 	emit_branch( cond_label, s);
 	emit_label_def( end_label, s);
@@ -1371,14 +1373,15 @@ void typcase_class::code(ostream &s) {
 		Symbol type = cases->nth( i)->type_decl;
 
 		CgenNodeP class_node = global_table->lookup( type);
-		push_vec( class_node->get_class_tag(),class_node->get_max_class_tag(), i);
+		push_vec( class_node->get_class_tag(), class_node->get_max_class_tag(), i);
 	}
 
 	sort_vec();
 
 	int temp = alloc_temp();
 
-	int x, y, c, cur_label, next_label = new_label();
+	int x, y, c, cur_label, next_label = last_label;
+	last_label = new_label();
 	for ( init_vec(); next_vec(); fetch_vec( x, y, c),
 			cur_label = next_label, next_label = new_label())
 	{
@@ -1518,8 +1521,13 @@ void lt_class::code(ostream &s) {
 	emit_push( S1, s);
 	emit_fetch_int( S1, ACC, s);
 	e2->code( s);
-	emit_fetch_int( ACC, ACC, s);
-	emit_slt( ACC, S1, ACC, s);
+	emit_fetch_int( T0, ACC, s);
+
+	int end_label = new_label();
+	emit_load_bool( ACC, truebool, s);
+	emit_blt( S1, T0, end_lable, s);
+	emit_load_bool( ACC, falsebool, s);
+	emit_label_def( end_lable, s);
 	emit_pop( S1, s);
 }
 
@@ -1533,19 +1541,10 @@ void eq_class::code(ostream &s) {
 	e2->code( s);
 	emit_pop( T0, s);
 
-	// This is a bool comparision.
-	if ( this->e1->get_type() == Bool)
-	{
-		emit_xor( ACC, ACC, T0, s);
-		emit_not( ACC, ACC, s);
-	}
-	else
-	{
-		emit_move( T1, ACC, s);
-		emit_move( A1, ZERO, s);
-		emit_load_imm( ACC, 1, s);
-		emit_jal( EQUALITY_TEST, s);
-	}
+	emit_move( T1, ACC, s);
+	emit_load_bool( A1, falsebool, s);
+	emit_load_bool( ACC, truebool, s);
+	emit_jal( EQUALITY_TEST, s);
 
 	/*
 	int true_branch = new_label();
@@ -1592,9 +1591,13 @@ void leq_class::code(ostream &s) {
 	emit_push( S1, s);
 	emit_fetch_int( S1, ACC, s);
 	e2->code( s);
-	emit_fetch_int( ACC, ACC, s);
-	emit_slt( ACC, ACC, S1, s);
-	emit_not( ACC, ACC, s);
+	emit_fetch_int( T0, ACC, s);
+
+	int end_label = new_label();
+	emit_load_bool( ACC, falsebool, s);
+	emit_blt( T0, S1, end_label, s);
+	emit_load_bool( ACC, truebool, s);
+	emit_label_def( end_label, s);
 	emit_pop( S1, s);
 }
 
@@ -1604,7 +1607,10 @@ int leq_class::get_temp_size() {
 
 void comp_class::code(ostream &s) {
 	e1->code( s);
-	emit_not( ACC, ACC, s);
+	emit_load_bool( T0, falsebool, s);
+	emit_xor( ACC, T0, ACC, s);
+	emit_load_bool( T0, truebool, s);
+	emit_xor( ACC, T0, ACC, s);
 }
 
 int comp_class::get_temp_size() {
@@ -1635,7 +1641,7 @@ int string_const_class::get_temp_size() {
 
 void bool_const_class::code(ostream& s)
 {
-	emit_load_imm( ACC, val, s);
+  emit_load_bool(ACC,BoolConst(val),s);
 }
 
 int bool_const_class::get_temp_size() {
@@ -1676,7 +1682,10 @@ int new__class::get_temp_size() {
 void isvoid_class::code(ostream &s) {
 	e1->code( s);
 
-	emit_not( ACC, ACC, s);
+	emit_load_bool( T0, falsebool, s);
+	emit_xor( ACC, T0, ACC, s);
+	emit_load_bool( T0, truebool, s);
+	emit_xor( ACC, T0, ACC, s);
 	/*
 	int else_label = new_label();
 	int end_label = new_label();
