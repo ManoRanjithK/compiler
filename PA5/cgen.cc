@@ -1368,7 +1368,7 @@ int loop_class::get_temp_size() {
 }
 
 void typcase_class::code(ostream &s) {
-	expr->code();
+	expr->code( s);
 	emit_load( ACC, TAG_OFFSET, ACC, s);
 
 	int last_label = new_label();
@@ -1414,8 +1414,13 @@ void typcase_class::code(ostream &s) {
 }
 
 int typcase_class::get_temp_size() {
-	// TODO: should be all of the branches.
-	return expr->get_temp_size() + 1;
+	int cnt = expr->get_temp_size();
+	for ( int i( cases->first()); cases->more( i); i = cases->next( i))
+	{
+		cnt = max( cnt, cases->nth( i)->expr->get_temp_size() + 1);
+	}
+
+	return cnt;
 }
 
 void block_class::code(ostream &s) {
@@ -1535,10 +1540,63 @@ int lt_class::get_temp_size() {
 }
 
 void eq_class::code(ostream &s) {
+	e1->code( s);
+	emit_push( ACC, s);
+	e2->code( s);
+	emit_pop( T0, s);
+
+	// This is a bool comparision.
+	if ( this->e1->get_type() == Bool)
+	{
+		emit_xor( ACC, ACC, T0, s);
+		emit_not( ACC, ACC, s);
+	}
+	else
+	{
+		emit_move( T1, ACC, s);
+		emit_move( A1, ZERO, s);
+		emit_load_imm( ACC, 1, s);
+		emit_jal( EQUALITY_TEST, s);
+	}
+
+	/*
+	int true_branch = new_label();
+	int false_branch = new_label();
+	int int_test_branch = new_label();
+	int str_test_branch = new_label();
+	int end_branch = new_label();
+
+	emit_beq( ACC, T0, true_branch, s);
+
+	emit_load( T1, TAG_OFFSET, T0, s);
+	emit_load( T2, TAG_OFFSET, ACC, s);
+
+	emit_bne( T1, T2, false_branch, s);
+
+	emit_load_imm( T2, global_table->lookup( Int)->get_class_tag(), s);
+	emit_beq( T1, T2, int_test_branch, s);
+	emit_load_imm( T2, global_table->lookup( Str)->get_class_tag(), s);
+	emit_beq( T1, T2, str_test_branch, s);
+	emit_load_imm( T2, global_table->lookup( Bool)->get_class_tag(), s);
+	emit_bne( T1, T2, false_branch, s);
+	emit_bne( ACC, T0, false_branch, s);
+
+	emit_label_def( true_branch, s);
+	emit_load_imm( ACC, 1, s);
+	emit_branch( end_branch, s);
+
+	emit_label_def( int_test_branch, s);
+	emit_label_def( str_test_branch, s);
+
+	emit_label_def( false_branch, s);
+	emit_move( ACC, ZERO, s);
+
+	emit_label_def( end_branch, s);
+	*/
 }
 
 int eq_class::get_temp_size() {
-	return 0;
+	return max( e1->get_temp_size(), e2->get_temp_size() + 1);
 }
 
 void leq_class::code(ostream &s) {
