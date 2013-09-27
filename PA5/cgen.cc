@@ -442,18 +442,18 @@ static void lookup_var( Symbol name)
 	}
 }
 
-static void emit_abort( int label, char *dest_addr, ostream &s)
+static void emit_abort( int label, int lineno, char *dest_addr, ostream &s)
 {
 	emit_bne( ACC, ZERO, label, s);
 	emit_load_string( ACC, stringtable.lookup_string( global_node->filename->get_string()), s);
-	emit_load_imm( T1, 1, s);
+	emit_load_imm( T1, lineno, s);
 	emit_jal( dest_addr, s);
 }
 
-static void emit_func_call( Symbol class_name, Symbol method_name, ostream &s)
+static void emit_func_call( Symbol class_name, Symbol method_name, int line_no, ostream &s)
 {
 	int good_label = new_label();
-	emit_abort( good_label, DISPATHABORT, s);
+	emit_abort( good_label, line_no, DISPATHABORT, s);
 
 	CgenNodeP node = global_table->lookup( class_name);
 	int offset = ( ( int)( node->lookup_method_offset( method_name))) - DEFAULT_METHOD_OFFSET;
@@ -1365,7 +1365,7 @@ void static_dispatch_class::code(ostream &s) {
 		emit_push( ACC, s);
 	}
 	expr->code( s);
-	emit_func_call( type, name, s);
+	emit_func_call( type, name, line_number, s);
 }
 
 int static_dispatch_class::get_temp_size() {
@@ -1390,7 +1390,7 @@ void dispatch_class::code(ostream &s) {
 		emit_push( ACC, s);
 	}
 	expr->code( s);
-	emit_func_call( type, name, s);
+	emit_func_call( type, name, line_number, s);
 }
 
 int dispatch_class::get_temp_size() {
@@ -1443,10 +1443,14 @@ int loop_class::get_temp_size() {
 
 void typcase_class::code(ostream &s) {
 	expr->code( s);
-	emit_load( ACC, TAG_OFFSET, ACC, s);
+
+	emit_load( T0, TAG_OFFSET, ACC, s);
 
 	int last_label = new_label();
-	emit_abort( last_label, CASEABORT2, s);
+	emit_abort( last_label, line_number, CASEABORT2, s);
+
+	if ( cgen_debug)
+		cout << "First label should be " << last_label << endl;
 
 	clear_vec();
 	for ( int i( cases->first()); cases->more( i); i = cases->next( i))
@@ -1462,14 +1466,23 @@ void typcase_class::code(ostream &s) {
 
 	int temp = alloc_temp() + DEFAULT_FRAME_OFFSET;
 
+	if ( cgen_debug)
+		cout << "Coding table, first label should be " << last_label << endl;
+
 	int x, y, c, cur_label, next_label = last_label;
 	last_label = new_label();
-	for ( init_vec(); next_vec(); fetch_vec( x, y, c),
-			cur_label = next_label, next_label = new_label())
+	for ( init_vec(); next_vec(); )
 	{
+		fetch_vec( x, y, c);
+		if ( cgen_debug)
+			cout << " Coding case branch tags " << x << " " << y << endl;
+		cur_label = next_label;
+		next_label = new_label();
+		if ( cgen_debug)
+			cout << "Coding case branch " << cur_label << " next " << next_label << endl;
 		emit_label_def( cur_label, s);
-		emit_blti( ACC, x, next_label, s);
-		emit_bgti( ACC, y, next_label, s);
+		emit_blti( T0, x, next_label, s);
+		emit_bgti( T0, y, next_label, s);
 
 		Case br = cases->nth( c);
 		method_var_table->enterscope();
