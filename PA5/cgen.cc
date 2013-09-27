@@ -1800,8 +1800,8 @@ void new__class::code(ostream &s) {
 		s << JAL; emit_method_ref( ::Object, ::copy, s); s << endl;
 
 		// Run init.
-		emit_load( ACC, 1, S1, s);
-		emit_jalr( ACC, s);
+		emit_load( T0, 1, S1, s);
+		emit_jalr( T0, s);
 		emit_pop( S1, s);
 	}
 	else
