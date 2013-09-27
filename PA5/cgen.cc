@@ -1810,6 +1810,8 @@ void new__class::code(ostream &s) {
 		{
 			emit_new( type_name, s);
 			s << JAL; emit_init_ref( type_name, s); s << endl;
+
+			expr_is_const = 1;
 		}
 		else
 		{
@@ -1881,6 +1883,7 @@ void object_class::code(ostream &s) {
 		if ( cgen_debug)
 			cout << "Find reg " << object_base_reg << " offset " << object_offset << endl;
 		emit_load( ACC, object_offset, object_base_reg, s);
+		expr_is_const = 1;
 	}
 	else
 	{
