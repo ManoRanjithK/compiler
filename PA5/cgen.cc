@@ -384,7 +384,9 @@ static void emit_func_before( int temp_size, ostream &s)
 	emit_store( SELF, -1, SP, s);
 	emit_store( RA, -2, SP, s);
 	emit_addiu( SP, SP, ( -3 - temp_size) * WORD_SIZE, s);
+
 	emit_addiu( FP, SP, WORD_SIZE, s);
+	emit_move( SELF, ACC, s);
 }
 
 static void emit_func_after( int temp_size, ostream &s)
@@ -439,11 +441,9 @@ static void emit_func_call( Symbol class_name, Symbol method_name, ostream &s)
 	CgenNodeP node = global_table->lookup( class_name);
 	int offset = ( ( int)( node->lookup_method_offset( method_name))) - DEFAULT_OBJFIELDS;
 
-	emit_push( ACC, s);
-	emit_partial_load_address( ACC, s); emit_disptable_ref( class_name, s); s << endl;
-	emit_load( ACC, offset, ACC, s);
-	emit_jalr( ACC, s);
-	emit_pop( ACC, s);
+	emit_partial_load_address( T0, s); emit_disptable_ref( class_name, s); s << endl;
+	emit_load( T0, offset, T0, s);
+	emit_jalr( T0, s);
 }
 
 static void emit_not( char *dest_reg, char *source_reg, ostream &s)
@@ -1262,7 +1262,7 @@ CgenNode::CgenNode(Class_ nd, Basicness bstatus, CgenClassTableP ct) :
 void attr_class::code( ostream &s) {
 	init->code( s);
 	int offset = ( int)( ::var_table->lookup( get_name()));
-	emit_store( ACC, offset << 2, SELF, s);
+	emit_store( ACC, offset, SELF, s);
 }
 
 int attr_class::get_temp_size() {
@@ -1297,7 +1297,7 @@ int method_class::get_temp_size() {
 void assign_class::code(ostream &s) {
 	expr->code( s);
 	lookup_var( name);
-	emit_store( ACC, object_offset << 2, object_base_reg, s);
+	emit_store( ACC, object_offset, object_base_reg, s);
 }
 
 int assign_class::get_temp_size() {
@@ -1468,7 +1468,7 @@ int block_class::get_temp_size() {
 void let_class::code(ostream &s) {
 	init->code( s);
 	int offset = alloc_temp();
-	emit_store( ACC, offset << 2, FP, s);
+	emit_store( ACC, offset, FP, s);
 	method_var_table->enterscope();
 	method_var_table->addid( identifier, ( void *)( offset + DEFAULT_OBJFIELDS));
 	body->code( s);
@@ -1779,8 +1779,18 @@ int no_expr_class::get_temp_size() {
 }
 
 void object_class::code(ostream &s) {
-	lookup_var( name);
-	emit_addiu( ACC, object_base_reg, object_offset << 2, s);
+	if ( cgen_debug)
+		cout << "Looking for var " << name << endl;
+
+	if ( name != self)
+	{
+		lookup_var( name);
+		emit_load( ACC, object_offset, object_base_reg, s);
+	}
+	else
+	{
+		emit_move( ACC, SELF, s);
+	}
 }
 
 int object_class::get_temp_size() {
