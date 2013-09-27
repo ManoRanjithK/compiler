@@ -436,11 +436,23 @@ static void lookup_var( Symbol name)
 	}
 }
 
+static void emit_abort( int label, char *dest_addr, ostream &s)
+{
+	emit_bne( ACC, ZERO, label, s);
+	emit_load_string( ACC, stringtable.lookup_string( global_node->filename->get_string()), s);
+	emit_load_imm( T1, 1, s);
+	emit_jal( dest_addr, s);
+}
+
 static void emit_func_call( Symbol class_name, Symbol method_name, ostream &s)
 {
+	int good_label = new_label();
+	emit_abort( good_label, DISPATHABORT, s);
+
 	CgenNodeP node = global_table->lookup( class_name);
 	int offset = ( ( int)( node->lookup_method_offset( method_name))) - DEFAULT_OBJFIELDS;
 
+	emit_label_def( good_label, s);
 	emit_partial_load_address( T0, s); emit_disptable_ref( class_name, s); s << endl;
 	emit_load( T0, offset, T0, s);
 	emit_jalr( T0, s);
@@ -1398,9 +1410,7 @@ void typcase_class::code(ostream &s) {
 	emit_load( ACC, TAG_OFFSET, ACC, s);
 
 	int last_label = new_label();
-	emit_bne( ACC, ZERO, last_label, s);
-	emit_load_string( ACC, stringtable.lookup_string( global_node->filename->get_string()), s);
-	emit_jal( CASEABORT2, s);
+	emit_abort( last_label, CASEABORT2, s);
 
 	clear_vec();
 	for ( int i( cases->first()); cases->more( i); i = cases->next( i))

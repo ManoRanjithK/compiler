@@ -125,3 +125,4 @@ static char *reg_S[] = { SELF, S1, S2, S3, S4, S5, S6};
 #define CASEABORT "_case_abort"
 #define CASEABORT2 "_case_abort2"
 #define EQUALITY_TEST "equality_test"
+#define DISPATHABORT "__dispatch_abort"
