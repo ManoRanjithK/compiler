@@ -1301,7 +1301,12 @@ CgenNode::CgenNode(Class_ nd, Basicness bstatus, CgenClassTableP ct) :
 void attr_class::code( ostream &s) {
 	init->code( s);
 	int offset = ( int)( ::var_table->lookup( get_name()));
-	emit_store( ACC, offset, SELF, s);
+	if ( cgen_debug)
+		cout << get_name() << " was initailized as a " << ( void *) ( init->get_type()) << endl;
+	if ( init->get_type())
+	{
+		emit_store( ACC, offset, SELF, s);
+	}
 }
 
 int attr_class::get_temp_size() {
