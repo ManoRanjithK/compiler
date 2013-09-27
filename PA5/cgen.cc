@@ -450,20 +450,6 @@ static void emit_abort( int label, int lineno, char *dest_addr, ostream &s)
 	emit_jal( dest_addr, s);
 }
 
-static void emit_func_call( Symbol class_name, Symbol method_name, int line_no, ostream &s)
-{
-	int good_label = new_label();
-	emit_abort( good_label, line_no, DISPATHABORT, s);
-
-	CgenNodeP node = global_table->lookup( class_name);
-	int offset = ( ( int)( node->lookup_method_offset( method_name))) - DEFAULT_METHOD_OFFSET;
-
-	emit_label_def( good_label, s);
-	emit_partial_load_address( T0, s); emit_disptable_ref( class_name, s); s << endl;
-	emit_load( T0, offset, T0, s);
-	emit_jalr( T0, s);
-}
-
 static void emit_not( char *dest_reg, char *source_reg, ostream &s)
 {
 	s << NOT << dest_reg << " " << source_reg << endl;
@@ -1365,7 +1351,17 @@ void static_dispatch_class::code(ostream &s) {
 		emit_push( ACC, s);
 	}
 	expr->code( s);
-	emit_func_call( type, name, line_number, s);
+
+	int good_label = new_label();
+	emit_abort( good_label, line_number, DISPATHABORT, s);
+
+	CgenNodeP node = global_table->lookup( type);
+	int offset = ( ( int)( node->lookup_method_offset( name))) - DEFAULT_METHOD_OFFSET;
+
+	emit_label_def( good_label, s);
+	emit_partial_load_address( T0, s); emit_disptable_ref( type, s); s << endl;
+	emit_load( T0, offset, T0, s);
+	emit_jalr( T0, s);
 }
 
 int static_dispatch_class::get_temp_size() {
@@ -1390,7 +1386,17 @@ void dispatch_class::code(ostream &s) {
 		emit_push( ACC, s);
 	}
 	expr->code( s);
-	emit_func_call( type, name, line_number, s);
+
+	int good_label = new_label();
+	emit_abort( good_label, line_number, DISPATHABORT, s);
+
+	CgenNodeP node = global_table->lookup( type);
+	int offset = ( ( int)( node->lookup_method_offset( name))) - DEFAULT_METHOD_OFFSET;
+
+	emit_label_def( good_label, s);
+	emit_load( T0, DISPTABLE_OFFSET, ACC, s);
+	emit_load( T0, offset, T0, s);
+	emit_jalr( T0, s);
 }
 
 int dispatch_class::get_temp_size() {
