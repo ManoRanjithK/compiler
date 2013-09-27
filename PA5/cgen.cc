@@ -438,7 +438,7 @@ static void lookup_var( Symbol name)
 	}
 	else
 	{
-		object_offset -= DEFAULT_OBJFIELDS;
+		object_offset -= DEFAULT_FRAME_OFFSET;
 		object_base_reg = FP;
 	}
 }
@@ -457,7 +457,7 @@ static void emit_func_call( Symbol class_name, Symbol method_name, ostream &s)
 	emit_abort( good_label, DISPATHABORT, s);
 
 	CgenNodeP node = global_table->lookup( class_name);
-	int offset = ( ( int)( node->lookup_method_offset( method_name))) - DEFAULT_OBJFIELDS;
+	int offset = ( ( int)( node->lookup_method_offset( method_name))) - DEFAULT_METHOD_OFFSET;
 
 	emit_label_def( good_label, s);
 	emit_partial_load_address( T0, s); emit_disptable_ref( class_name, s); s << endl;
@@ -807,6 +807,8 @@ CgenClassTable::CgenClassTable(Classes classes, ostream& s) : nds(NULL) , str(s)
    CgenNode::set_class_count( 0);
    root()->walk_down();
 
+   reverse_ordered_nds();
+
    code();
 
    exitscope();
@@ -971,7 +973,6 @@ void CgenClassTable::build_inheritance_tree()
   for(List<CgenNode> *l = nds; l; l = l->tl())
   {
       set_relations(l->hd());
-      ordered_nds = new List<CgenNode>( l->hd(), ordered_nds);
   }
 }
 
@@ -1001,7 +1002,7 @@ void CgenNode::count_Features()
 			if ( !this->method_table.lookup( name))
 			{
 				this->method_offset_table.addid( name,
-						( void *)( dispatch_table_size++ + DEFAULT_OBJFIELDS));
+						( void *)( dispatch_table_size++ + DEFAULT_METHOD_OFFSET));
 				method_list->set_tl( new class_method_list( name));
 				method_list = method_list->tl();
 
@@ -1032,9 +1033,23 @@ void CgenNode::code_disptab( ostream &str)
 	}
 }
 
+void CgenClassTable::reverse_ordered_nds() {
+	List<CgenNode> *new_nds = NULL;
+	for ( List<CgenNode> *leg = ordered_nds; leg; leg = leg->tl())
+	{
+		new_nds = new List<CgenNode>( leg->hd(), new_nds);
+	}
+	ordered_nds = new_nds;
+}
+
+void CgenClassTable::push_ordered_nds( CgenNodeP node) {
+	ordered_nds = new List<CgenNode>( node, ordered_nds);
+}
+
 void CgenNode::walk_down()
 {
 	class_tag = class_count++;
+	global_table->push_ordered_nds( this);
 
 	class_method_list *method_list_head = new class_method_list( NULL, NULL);
 	method_list = method_list_head;
@@ -1298,7 +1313,7 @@ void method_class::code( ostream &s) {
 
 	emit_func_before( temps, s);
 
-	int cnt = DEFAULT_OBJFIELDS;
+	int cnt = DEFAULT_FRAME_OFFSET;
 	for ( int i = formals->first(); formals->more( i); i = formals->next( i))
 	{
 		method_var_table->addid( formals->nth( i)->get_name(), ( void *)( cnt++));
@@ -1445,7 +1460,7 @@ void typcase_class::code(ostream &s) {
 
 		Case br = cases->nth( c);
 		method_var_table->enterscope();
-		method_var_table->addid( br->get_name(), ( void *)( temp + DEFAULT_OBJFIELDS));
+		method_var_table->addid( br->get_name(), ( void *)( temp + DEFAULT_FRAME_OFFSET));
 		br->get_expr()->code( s);
 		method_var_table->exitscope();
 		emit_branch( last_label, s);
@@ -1488,7 +1503,7 @@ void let_class::code(ostream &s) {
 	int offset = alloc_temp();
 	emit_store( ACC, offset, FP, s);
 	method_var_table->enterscope();
-	method_var_table->addid( identifier, ( void *)( offset + DEFAULT_OBJFIELDS));
+	method_var_table->addid( identifier, ( void *)( offset + DEFAULT_FRAME_OFFSET));
 	body->code( s);
 	method_var_table->exitscope();
 }

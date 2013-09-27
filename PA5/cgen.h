@@ -56,6 +56,9 @@ public:
    CgenClassTable(Classes, ostream& str);
    void code();
    CgenNodeP root();
+
+   void push_ordered_nds( CgenNodeP node);
+   void reverse_ordered_nds();
 };
 
 
