@@ -781,16 +781,16 @@ CgenClassTable::CgenClassTable(Classes classes, ostream& s) : nds(NULL) , str(s)
    if (cgen_debug) cout << "Building CgenClassTable" << endl;
    install_basic_classes();
 
-   stringclasstag = lookup( Str)->get_class_tag();
-   intclasstag = lookup( Int)->get_class_tag();
-   boolclasstag = lookup( Bool)->get_class_tag();
-
    install_classes(classes);
 
    build_inheritance_tree();
 
    CgenNode::set_class_count( 0);
    root()->walk_down();
+
+   stringclasstag = lookup( Str)->get_class_tag();
+   intclasstag = lookup( Int)->get_class_tag();
+   boolclasstag = lookup( Bool)->get_class_tag();
 
    reverse_ordered_nds();
 
@@ -1471,6 +1471,8 @@ void typcase_class::code(ostream &s) {
 
 		CgenNodeP class_node = global_table->lookup( type);
 		push_vec( class_node->get_class_tag(), class_node->get_max_class_tag(), i);
+		if ( cgen_debug)
+			cout << " Coding case with class " << type << " tag " << class_node->get_class_tag() << endl;
 	}
 
 	sort_vec();
