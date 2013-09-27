@@ -387,10 +387,10 @@ static void emit_gc_check(char *source, ostream &s)
 
 static void emit_func_before( int temp_size, ostream &s)
 {
-	emit_store( FP, 0, SP, s);
-	emit_store( SELF, -1, SP, s);
-	emit_store( RA, -2, SP, s);
 	emit_addiu( SP, SP, ( -3 - temp_size) * WORD_SIZE, s);
+	emit_store( FP, 3, SP, s);
+	emit_store( SELF, 2, SP, s);
+	emit_store( RA, 1, SP, s);
 
 	emit_addiu( FP, SP, WORD_SIZE, s);
 	emit_move( SELF, ACC, s);
@@ -398,10 +398,10 @@ static void emit_func_before( int temp_size, ostream &s)
 
 static void emit_func_after( int temp_size, ostream &s)
 {
+	emit_load( RA, 1, SP, s);
+	emit_load( SELF, 2, SP, s);
+	emit_load( FP, 3, SP, s);
 	emit_addiu( SP, SP, ( 3 + temp_size) * WORD_SIZE, s);
-	emit_load( RA, -2, SP, s);
-	emit_load( SELF, -1, SP, s);
-	emit_load( FP, 0, SP, s);
 
 	emit_return( s);
 }
@@ -438,7 +438,6 @@ static void lookup_var( Symbol name)
 	}
 	else
 	{
-		object_offset -= DEFAULT_FRAME_OFFSET;
 		object_base_reg = FP;
 	}
 }
@@ -1122,6 +1121,10 @@ void CgenNode::code_prototype( ostream &str)
 	if ( cgen_debug)
 		cout << "Coding prototype for class " << get_name() << endl;
 
+	int stringclasstag = global_table->lookup( Str)->get_class_tag();
+	int intclasstag = global_table->lookup( Int)->get_class_tag();
+	int boolclasstag = global_table->lookup( Bool)->get_class_tag();
+
 	for ( int i = features->first(); features->more( i); i = features->next( i))
 	{
 		if ( !features->nth( i)->is_method())
@@ -1129,29 +1132,28 @@ void CgenNode::code_prototype( ostream &str)
 			str << WORD;
 			if ( cgen_debug)
 				cout << "  attr " << features->nth( i)->get_type() << endl;
-			CgenNodeP leg = global_table->lookup( features->nth( i)->get_type());
-			switch ( leg->class_tag)
+			Symbol type = features->nth( i)->get_type();
+			if ( type == Int)
 			{
-				case 2:
-					// Int member.
-					inttable.lookup_string( "0")->code_ref( str); str << endl;
-					break;
-				case 3:
-					// Bool member.
+				inttable.lookup_string( "0")->code_ref( str); str << endl;
+			}
+			else
+			{
+				if ( type == Bool)
+				{
 					falsebool.code_ref( str); str << endl;
-					break;
-				case 4:
-					// String member.
-					stringtable.lookup_string( "")->code_ref( str); str << endl;
-					break;
-				case -1:
-					// prim_slot member;
-				case 0:
-					// Object member.
-				case 1:
-					// IO member.
-				default:
-					str << 0 << endl;
+				}
+				else
+				{
+					if ( type == Str)
+					{
+						stringtable.lookup_string( "")->code_ref( str); str << endl;
+					}
+					else
+					{
+						str << 0 << endl;
+					}
+				}
 			}
 		}
 	}
@@ -1160,6 +1162,8 @@ void CgenNode::code_prototype( ostream &str)
 void CgenNode::code_initializer( ostream &str)
 {
 	global_node = this;
+	init_alloc_temp();
+
 	int cnt = 0;
 	for ( int i = features->first(); features->more( i); i = features->next( i))
 	{
@@ -1313,20 +1317,24 @@ void method_class::code( ostream &s) {
 
 	emit_func_before( temps, s);
 
-	int cnt = DEFAULT_FRAME_OFFSET;
+	int len = formals->len();
+	int cnt = DEFAULT_FRAME_OFFSET + temps + len;
 	for ( int i = formals->first(); formals->more( i); i = formals->next( i))
 	{
-		method_var_table->addid( formals->nth( i)->get_name(), ( void *)( cnt++));
+		if ( cgen_debug)
+			cout << "Find method formal " << formals->nth( i)->get_name() << endl;
+		method_var_table->addid( formals->nth( i)->get_name(), ( void *)( --cnt));
 	}
 	expr->code( s);
 
-	emit_func_after( temps, s);
+	// Rebalance stack.
+	emit_func_after( temps + len, s);
 
 	method_var_table->exitscope();
 }
 
 int method_class::get_temp_size() {
-	return formals->len() + expr->get_temp_size();
+	return expr->get_temp_size();
 }
 
 void assign_class::code(ostream &s) {
@@ -1447,7 +1455,7 @@ void typcase_class::code(ostream &s) {
 
 	sort_vec();
 
-	int temp = alloc_temp();
+	int temp = alloc_temp() + DEFAULT_FRAME_OFFSET;
 
 	int x, y, c, cur_label, next_label = last_label;
 	last_label = new_label();
@@ -1460,7 +1468,7 @@ void typcase_class::code(ostream &s) {
 
 		Case br = cases->nth( c);
 		method_var_table->enterscope();
-		method_var_table->addid( br->get_name(), ( void *)( temp + DEFAULT_FRAME_OFFSET));
+		method_var_table->addid( br->get_name(), ( void *)( temp));
 		br->get_expr()->code( s);
 		method_var_table->exitscope();
 		emit_branch( last_label, s);
@@ -1500,10 +1508,10 @@ int block_class::get_temp_size() {
 
 void let_class::code(ostream &s) {
 	init->code( s);
-	int offset = alloc_temp();
+	int offset = alloc_temp() + DEFAULT_FRAME_OFFSET;
 	emit_store( ACC, offset, FP, s);
 	method_var_table->enterscope();
-	method_var_table->addid( identifier, ( void *)( offset + DEFAULT_FRAME_OFFSET));
+	method_var_table->addid( identifier, ( void *)( offset));
 	body->code( s);
 	method_var_table->exitscope();
 }
@@ -1818,6 +1826,8 @@ void object_class::code(ostream &s) {
 	if ( name != self)
 	{
 		lookup_var( name);
+		if ( cgen_debug)
+			cout << "Find reg " << object_base_reg << " offset " << object_offset << endl;
 		emit_load( ACC, object_offset, object_base_reg, s);
 	}
 	else

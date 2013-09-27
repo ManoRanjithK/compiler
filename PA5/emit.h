@@ -129,5 +129,4 @@ static char *reg_S[] = { SELF, S1, S2, S3, S4, S5, S6};
 #define GENGC_ASSIGN "_GenGC_Assign"
 
 #define DEFAULT_FRAME_OFFSET 3
-
 #define DEFAULT_METHOD_OFFSET 3
