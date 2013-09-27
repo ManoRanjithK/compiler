@@ -1299,12 +1299,12 @@ CgenNode::CgenNode(Class_ nd, Basicness bstatus, CgenClassTableP ct) :
 //*****************************************************************
 
 void attr_class::code( ostream &s) {
-	init->code( s);
-	int offset = ( int)( ::var_table->lookup( get_name()));
-	if ( cgen_debug)
-		cout << get_name() << " was initailized as a " << ( void *) ( init->get_type()) << endl;
 	if ( init->get_type())
 	{
+		init->code( s);
+		int offset = ( int)( ::var_table->lookup( get_name()));
+		if ( cgen_debug)
+			cout << get_name() << " was initailized as a " << init->get_type() << endl;
 		emit_store( ACC, offset, SELF, s);
 	}
 }
@@ -1512,8 +1512,36 @@ int block_class::get_temp_size() {
 }
 
 void let_class::code(ostream &s) {
-	init->code( s);
 	int offset = alloc_temp() + DEFAULT_FRAME_OFFSET;
+	if ( init->get_type())
+	{
+		init->code( s);
+	}
+	else
+	{
+		if ( type_decl == Int)
+		{
+			emit_load_int( ACC, inttable.lookup_string( "0"), s);
+		}
+		else
+		{
+			if ( type_decl == Bool)
+			{
+				emit_load_bool( ACC, falsebool, s);
+			}
+			else
+			{
+				if ( type_decl == Str)
+				{
+					emit_load_string( ACC, stringtable.lookup_string( ""), s);
+				}
+				else
+				{
+					init->code( s);
+				}
+			}
+		}
+	}
 	emit_store( ACC, offset, FP, s);
 	method_var_table->enterscope();
 	method_var_table->addid( identifier, ( void *)( offset));
@@ -1628,7 +1656,7 @@ void eq_class::code(ostream &s) {
 	e1->code( s);
 	emit_push( ACC, s);
 	e2->code( s);
-	emit_pop( T0, s);
+	emit_pop( T2, s);
 
 	emit_move( T1, ACC, s);
 	emit_load_bool( A1, falsebool, s);
