@@ -1680,7 +1680,12 @@ void eq_class::code(ostream &s) {
 	emit_move( T1, ACC, s);
 	emit_load_bool( A1, falsebool, s);
 	emit_load_bool( ACC, truebool, s);
+
+	int good_label = new_label();
+	emit_xor( T0, T1, T2, s);
+	emit_beqz( T0, good_label, s);
 	emit_jal( EQUALITY_TEST, s);
+	emit_label_def( good_label, s);
 
 	/*
 	int true_branch = new_label();
