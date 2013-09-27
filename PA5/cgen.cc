@@ -1096,20 +1096,12 @@ void CgenNode::code_classobjentry( ostream &str)
 	str << WORD; emit_init_ref( get_name(), str); str << endl;
 }
 
-void CgenNode::code_prototype( ostream &str)
+void CgenNode::code_prototype_data( ostream &str)
 {
-	str << WORD << "-1" << endl;
-	emit_protobj_ref( get_name(), str); str << LABEL
-		<< WORD << class_tag << endl
-		<< WORD << ( DEFAULT_OBJFIELDS + object_size) << endl
-		<< WORD; emit_disptable_ref( get_name(), str); str << endl;
-
-	if ( cgen_debug)
-		cout << "Coding prototype for class " << get_name() << endl;
-
-	int stringclasstag = global_table->lookup( Str)->get_class_tag();
-	int intclasstag = global_table->lookup( Int)->get_class_tag();
-	int boolclasstag = global_table->lookup( Bool)->get_class_tag();
+	if ( get_name() != Object)
+	{
+		parentnd->code_prototype_data( str);
+	}
 
 	for ( int i = features->first(); features->more( i); i = features->next( i))
 	{
@@ -1145,6 +1137,20 @@ void CgenNode::code_prototype( ostream &str)
 	}
 }
 
+void CgenNode::code_prototype( ostream &str)
+{
+	str << WORD << "-1" << endl;
+	emit_protobj_ref( get_name(), str); str << LABEL
+		<< WORD << class_tag << endl
+		<< WORD << ( DEFAULT_OBJFIELDS + object_size) << endl
+		<< WORD; emit_disptable_ref( get_name(), str); str << endl;
+
+	if ( cgen_debug)
+		cout << "Coding prototype for class " << get_name() << endl;
+
+	code_prototype_data( str);
+}
+
 void CgenNode::code_initializer( ostream &str)
 {
 	global_node = this;
@@ -1161,8 +1167,6 @@ void CgenNode::code_initializer( ostream &str)
 
 	emit_init_ref( get_name(), str); str << LABEL;
 	emit_func_before( cnt, str);
-
-	emit_move( SELF, ACC, str);
 
 	if ( get_name() != Object)
 	{

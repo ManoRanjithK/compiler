@@ -103,6 +103,7 @@ public:
 
    void walk_down();
 
+   void code_prototype_data( ostream &str);
    void code_prototype( ostream &str);
    void code_classnameentry( ostream &str);
    void code_classobjentry( ostream &str);
