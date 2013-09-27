@@ -458,14 +458,19 @@ static void emit_slt( char *dest_reg, char *src0_reg, char *src1_reg, ostream &s
 	s << SLT << dest_reg << " " << src0_reg << " " << src1_reg << endl;
 }
 
-static void emit_nor( char *dest_reg, char *source_reg, ostream &s)
+static void emit_nor( char *dest_reg, char *src0_reg, char *src1_reg, ostream &s)
 {
-	s << NOR << dest_reg << " " << source_reg << endl;
+	s << NOR << dest_reg << " " << src0_reg << " " << src1_reg << endl;
 }
 
 static void emit_xor( char *dest_reg, char *src0_reg, char *src1_reg, ostream &s)
 {
 	s << XOR << dest_reg << " " << src0_reg << " " << src1_reg << endl;
+}
+
+static void emit_and( char *dest_reg, char *src0_reg, char *src1_reg, ostream &s)
+{
+	s << AND << dest_reg << " " << src0_reg << " " << src1_reg << endl;
 }
 
 
@@ -1705,10 +1710,26 @@ int new__class::get_temp_size() {
 void isvoid_class::code(ostream &s) {
 	e1->code( s);
 
+	int end_label = new_label();
+	emit_load_bool( T0, falsebool, s);
+	emit_bne( ACC, ZERO, end_label, s);
+	emit_load_bool( T0, truebool, s);
+	emit_label_def( end_label, s);
+	emit_move( ACC, T0, s);
+	/*
 	emit_load_bool( T0, falsebool, s);
 	emit_xor( ACC, T0, ACC, s);
 	emit_load_bool( T0, truebool, s);
 	emit_xor( ACC, T0, ACC, s);
+	*/
+	/*
+	emit_not( T1, ACC, s);
+	emit_load_bool( T0, falsebool, s);
+	emit_and( ACC, ACC, T0, s);
+	emit_load_bool( T0, truebool, s);
+	emit_and( T1, T1, T0, s);
+	emit_or( ACC, T1, ACC, s);
+	*/
 	/*
 	int else_label = new_label();
 	int end_label = new_label();

@@ -107,10 +107,11 @@
 #define BGT      "\tbgt\t"
 
 // Ops by Jing Yang
-#define NOT   "\tnot\n"
-#define SLT   "\tslt\n"
-#define NOR   "\tnor\n"
-#define XOR   "\txor\n"
+#define NOT   "\tnot\t"
+#define SLT   "\tslt\t"
+#define NOR   "\tnor\t"
+#define XOR   "\txor\t"
+#define AND   "\tand\t"
 
 #define T0    "t0"
 #define S1    "s1"
