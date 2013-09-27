@@ -71,7 +71,10 @@ void dump_with_types(ostream&,int);
 #define Feature_EXTRAS                                        \
 virtual void dump_with_types(ostream&,int) = 0; 	      \
 virtual void code( ostream &s) = 0; 			      \
-virtual int get_temp_size() = 0;
+virtual int is_method() const = 0; 			      \
+virtual int get_temp_size() = 0; 			      \
+virtual Symbol get_type() const = 0;			      \
+virtual Symbol get_name() const = 0;
 
 
 #define Feature_SHARED_EXTRAS                                       \

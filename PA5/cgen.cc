@@ -440,7 +440,7 @@ static void emit_func_call( Symbol class_name, Symbol method_name, ostream &s)
 	int offset = ( ( int)( node->lookup_method_offset( method_name))) - DEFAULT_OBJFIELDS;
 
 	emit_push( ACC, s);
-	emit_partial_load_address( ACC, s); emit_disptable_ref( class_name, s);
+	emit_partial_load_address( ACC, s); emit_disptable_ref( class_name, s); s << endl;
 	emit_load( ACC, offset << 2, ACC, s);
 	emit_jalr( ACC, s);
 	emit_pop( ACC, s);
@@ -1084,37 +1084,41 @@ void CgenNode::code_prototype( ostream &str)
 		<< WORD << ( DEFAULT_OBJFIELDS + object_size) << endl
 		<< WORD; emit_disptable_ref( get_name(), str); str << endl;
 
-	for ( List< CgenNode> *leg = children; leg; leg = leg->tl())
+	if ( cgen_debug)
+		cout << "Coding prototype for class " << get_name() << endl;
+
+	for ( int i = features->first(); features->more( i); i = features->next( i))
 	{
-		char *prefix = "";
-		if ( leg->hd()->basic() == Basic)
+		if ( !features->nth( i)->is_method())
 		{
-			switch ( leg->hd()->class_tag)
+			str << WORD;
+			if ( cgen_debug)
+				cout << "  attr " << features->nth( i)->get_type() << endl;
+			CgenNodeP leg = global_table->lookup( features->nth( i)->get_type());
+			switch ( leg->class_tag)
 			{
-				case 0:
-					// Object member.
-					break;
-				case 1:
-					// IO member.
-					break;
 				case 2:
 					// Int member.
-					prefix = INTCONST_PREFIX;
+					inttable.lookup_string( "0")->code_ref( str); str << endl;
 					break;
 				case 3:
 					// Bool member.
-					prefix = BOOLCONST_PREFIX;
+					falsebool.code_ref( str); str << endl;
 					break;
 				case 4:
 					// String member.
-					prefix = STRCONST_PREFIX;
+					stringtable.lookup_string( "")->code_ref( str); str << endl;
 					break;
+				case -1:
+					// prim_slot member;
+				case 0:
+					// Object member.
+				case 1:
+					// IO member.
 				default:
-					if ( cgen_debug)
-					cout << "BUG: a Basic class is not int, bool or string." << endl;
+					str << 0 << endl;
 			}
 		}
-		str << WORD << prefix << "0" << endl;
 	}
 }
 
@@ -1301,13 +1305,19 @@ int assign_class::get_temp_size() {
 }
 
 void static_dispatch_class::code(ostream &s) {
+	Symbol type = type_name;
+	if ( type == SELF_TYPE)
+	{
+		type = global_node->get_name();
+	}
+
 	for ( int i = actual->first(); actual->more( i); i = actual->next( i))
 	{
 		actual->nth( i)->code( s);
 		emit_push( ACC, s);
 	}
 	expr->code( s);
-	emit_func_call( type_name, name, s);
+	emit_func_call( type, name, s);
 }
 
 int static_dispatch_class::get_temp_size() {
@@ -1320,7 +1330,11 @@ int static_dispatch_class::get_temp_size() {
 }
 
 void dispatch_class::code(ostream &s) {
-	Symbol type_name = expr->get_type();
+	Symbol type = expr->get_type();
+	if ( type == SELF_TYPE)
+	{
+		type = global_node->get_name();
+	}
 
 	for ( int i = actual->first(); actual->more( i); i = actual->next( i))
 	{
@@ -1328,7 +1342,7 @@ void dispatch_class::code(ostream &s) {
 		emit_push( ACC, s);
 	}
 	expr->code( s);
-	emit_func_call( type_name, name, s);
+	emit_func_call( type, name, s);
 }
 
 int dispatch_class::get_temp_size() {

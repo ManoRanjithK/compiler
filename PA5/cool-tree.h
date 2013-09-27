@@ -50,8 +50,6 @@ public:
    tree_node *copy()		 { return copy_Feature(); }
    virtual Feature copy_Feature() = 0;
 
-   virtual int is_method() const = 0;
-   virtual Symbol get_name() const = 0;
 #ifdef Feature_EXTRAS
    Feature_EXTRAS
 #endif
@@ -192,6 +190,7 @@ public:
 
    int is_method() const { return 1;}
    Symbol get_name() const { return name;}
+   Symbol get_type() const { return return_type;}
 
 #ifdef Feature_SHARED_EXTRAS
    Feature_SHARED_EXTRAS
@@ -219,6 +218,7 @@ public:
 
    int is_method() const { return 0;}
    Symbol get_name() const { return name;}
+   Symbol get_type() const { return type_decl;}
 
 #ifdef Feature_SHARED_EXTRAS
    Feature_SHARED_EXTRAS
