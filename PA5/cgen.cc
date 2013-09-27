@@ -378,7 +378,7 @@ static void emit_gc_check(char *source, ostream &s)
   s << JAL << "_gc_check" << endl;
 }
 
-static void emit_func_call_before( int temp_size, ostream &s)
+static void emit_func_before( int temp_size, ostream &s)
 {
 	emit_store( FP, 0, SP, s);
 	emit_store( SELF, -1, SP, s);
@@ -387,7 +387,7 @@ static void emit_func_call_before( int temp_size, ostream &s)
 	emit_addiu( FP, SP, WORD_SIZE, s);
 }
 
-static void emit_func_call_after( int temp_size, ostream &s)
+static void emit_func_after( int temp_size, ostream &s)
 {
 	emit_addiu( SP, SP, ( 3 + temp_size) * WORD_SIZE, s);
 	emit_load( RA, -2, SP, s);
@@ -441,7 +441,7 @@ static void emit_func_call( Symbol class_name, Symbol method_name, ostream &s)
 
 	emit_push( ACC, s);
 	emit_partial_load_address( ACC, s); emit_disptable_ref( class_name, s); s << endl;
-	emit_load( ACC, offset << 2, ACC, s);
+	emit_load( ACC, offset, ACC, s);
 	emit_jalr( ACC, s);
 	emit_pop( ACC, s);
 }
@@ -1135,7 +1135,7 @@ void CgenNode::code_initializer( ostream &str)
 	}
 
 	emit_init_ref( get_name(), str); str << LABEL;
-	emit_func_call_before( cnt, str);
+	emit_func_before( cnt, str);
 
 	emit_move( SELF, ACC, str);
 
@@ -1156,7 +1156,7 @@ void CgenNode::code_initializer( ostream &str)
 
 	emit_move( ACC, SELF, str);
 
-	emit_func_call_after( cnt, str);
+	emit_func_after( cnt, str);
 }
 
 void CgenNode::code_class_methods( ostream &str)
@@ -1276,7 +1276,7 @@ void method_class::code( ostream &s) {
 
 	emit_method_ref( global_node->get_name(), name, s); s << LABEL;
 
-	emit_func_call_before( temps, s);
+	emit_func_before( temps, s);
 
 	int cnt = DEFAULT_OBJFIELDS;
 	for ( int i = formals->first(); formals->more( i); i = formals->next( i))
@@ -1285,7 +1285,7 @@ void method_class::code( ostream &s) {
 	}
 	expr->code( s);
 
-	emit_func_call_after( temps, s);
+	emit_func_after( temps, s);
 
 	method_var_table->exitscope();
 }
@@ -1707,7 +1707,7 @@ void new__class::code(ostream &s) {
 		s << JAL; emit_method_ref( ::Object, ::copy, s); s << endl;
 
 		// Run init.
-		emit_load( ACC, 4, S1, s);
+		emit_load( ACC, 1, S1, s);
 		emit_jalr( ACC, s);
 		emit_pop( S1, s);
 	}
