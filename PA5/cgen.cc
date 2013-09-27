@@ -179,8 +179,15 @@ static void emit_load(char *dest_reg, int offset, char *source_reg, ostream& s)
     << endl;
 }
 
+static void emit_addiu(char *dest, char *src1, int imm, ostream& s);
+static void emit_jal(char *address,ostream &s);
 static void emit_store(char *source_reg, int offset, char *dest_reg, ostream& s)
 {
+	if (  *( dest_reg + 1) != 'p' && cgen_Memmgr != GC_NOGC)
+	{
+		emit_addiu( A1, dest_reg, offset << 2, s);
+		emit_jal( GENGC_ASSIGN, s);
+	}
   s << SW << source_reg << " " << offset * WORD_SIZE << "(" << dest_reg << ")"
       << endl;
 }
@@ -694,6 +701,7 @@ void CgenClassTable::code_select_gc()
   //
   // Generate GC choice constants (pointers to GC functions)
   //
+	cgen_Memmgr = GC_NOGC;
   str << GLOBAL << "_MemMgr_INITIALIZER" << endl;
   str << "_MemMgr_INITIALIZER:" << endl;
   str << WORD << gc_init_names[cgen_Memmgr] << endl;
