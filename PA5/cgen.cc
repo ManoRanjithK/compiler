@@ -1460,6 +1460,10 @@ void typcase_class::code(ostream &s) {
 	emit_load( T0, TAG_OFFSET, ACC, s);
 	last_label = new_label();
 
+	int temp = alloc_temp() + DEFAULT_FRAME_OFFSET;
+
+	emit_store( ACC, temp, FP, s);
+
 	if ( cgen_debug)
 		cout << "First label should be " << last_label << endl;
 
@@ -1476,8 +1480,6 @@ void typcase_class::code(ostream &s) {
 	}
 
 	sort_vec();
-
-	int temp = alloc_temp() + DEFAULT_FRAME_OFFSET;
 
 	if ( cgen_debug)
 		cout << "Coding table, first label should be " << last_label << endl;
