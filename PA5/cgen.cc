@@ -381,28 +381,26 @@ static void emit_gc_check(char *source, ostream &s)
 static void emit_func_call_before( int temp_size, ostream &s)
 {
 	emit_store( FP, 0, SP, s);
-	emit_store( SELF, 4, SP, s);
-	emit_store( RA, 8, SP, s);
-	emit_addiu( SP, SP, -12 - temp_size, s);
-	emit_addiu( FP, SP, 4, s);
-	emit_move( SELF, ACC, s);
+	emit_store( SELF, -1, SP, s);
+	emit_store( RA, -2, SP, s);
+	emit_addiu( SP, SP, ( -3 - temp_size) * WORD_SIZE, s);
+	emit_addiu( FP, SP, WORD_SIZE, s);
 }
 
 static void emit_func_call_after( int temp_size, ostream &s)
 {
-	emit_move( ACC, SELF, s);
-	emit_addiu( SP, SP, 12 + temp_size, s);
-	emit_load( RA, 0, SP, s);
-	emit_load( SELF, 4, SP, s);
-	emit_load( FP, 8, SP, s);
+	emit_addiu( SP, SP, ( 3 + temp_size) * WORD_SIZE, s);
+	emit_load( RA, -2, SP, s);
+	emit_load( SELF, -1, SP, s);
+	emit_load( FP, 0, SP, s);
 
 	emit_return( s);
 }
 
 static void emit_new( Symbol name, ostream &s)
 {
-	emit_partial_load_address( ACC, s); emit_protobj_ref( name, s);
-	s << JAL; emit_method_ref( Object, copy, s);
+	emit_partial_load_address( ACC, s); emit_protobj_ref( name, s); s << endl;
+	s << JAL; emit_method_ref( Object, copy, s); s << endl;
 }
 
 int expr_is_const = 0;
@@ -1008,7 +1006,7 @@ void CgenNode::code_disptab( ostream &str)
 		Symbol method_id = methods->hd();
 		Symbol class_id = method_table.lookup( method_id);
 
-		str << WORD; emit_method_ref( class_id, method_id, str);
+		str << WORD; emit_method_ref( class_id, method_id, str); str << endl;
 
 		methods = methods->tl();
 	}
@@ -1069,13 +1067,13 @@ void CgenNode::set_parentnd(CgenNodeP p)
 
 void CgenNode::code_classnameentry( ostream &str)
 {
-	str << WORD; class_name_entry->code_ref( str);
+	str << WORD; class_name_entry->code_ref( str); str << endl;
 }
 
 void CgenNode::code_classobjentry( ostream &str)
 {
-	str << WORD; emit_protobj_ref( get_name(), str);
-	str << WORD; emit_init_ref( get_name(), str);
+	str << WORD; emit_protobj_ref( get_name(), str); str << endl;
+	str << WORD; emit_init_ref( get_name(), str); str << endl;
 }
 
 void CgenNode::code_prototype( ostream &str)
@@ -1083,8 +1081,8 @@ void CgenNode::code_prototype( ostream &str)
 	str << WORD << "-1" << endl;
 	emit_protobj_ref( get_name(), str); str << LABEL
 		<< WORD << class_tag << endl
-		<< WORD << ( DEFAULT_OBJFIELDS + object_size) << endl;
-	emit_disptable_ref( get_name(), str);
+		<< WORD << ( DEFAULT_OBJFIELDS + object_size) << endl
+		<< WORD; emit_disptable_ref( get_name(), str); str << endl;
 
 	for ( List< CgenNode> *leg = children; leg; leg = leg->tl())
 	{
@@ -1135,9 +1133,11 @@ void CgenNode::code_initializer( ostream &str)
 	emit_init_ref( get_name(), str); str << LABEL;
 	emit_func_call_before( cnt, str);
 
+	emit_move( SELF, ACC, str);
+
 	if ( get_name() != Object)
 	{
-		str << JAL; emit_init_ref( parentnd->get_name(), str);
+		str << JAL; emit_init_ref( parentnd->get_name(), str); str << endl;
 	}
 
 	::var_table = &( this->member_offset_table);
@@ -1150,21 +1150,26 @@ void CgenNode::code_initializer( ostream &str)
 	}
 	::var_table = NULL;
 
+	emit_move( ACC, SELF, str);
+
 	emit_func_call_after( cnt, str);
 }
 
 void CgenNode::code_class_methods( ostream &str)
 {
-	global_node = this;
-	::var_table = &( this->member_offset_table);
-	for ( int i = features->first(); features->more( i); i = features->next( i))
+	if ( !basic())
 	{
-		if ( features->nth( i)->is_method())
+		global_node = this;
+		::var_table = &( this->member_offset_table);
+		for ( int i = features->first(); features->more( i); i = features->next( i))
 		{
-			features->nth( i)->code( str);
+			if ( features->nth( i)->is_method())
+			{
+				features->nth( i)->code( str);
+			}
 		}
+		::var_table = NULL;
 	}
-	::var_table = NULL;
 }
 
 void CgenClassTable::code()
@@ -1233,7 +1238,10 @@ CgenNode::CgenNode(Class_ nd, Basicness bstatus, CgenClassTableP ct) :
    class_tag( class_count++),
    max_class_tag( class_tag)
 {
-   class_name_entry = stringtable.lookup_string(name->get_string());          // Add class name to string table
+	if ( class_tag >= 0)
+	{
+		class_name_entry = stringtable.add_string(name->get_string());          // Add class name to string table
+	}
 }
 
 
@@ -1262,7 +1270,7 @@ void method_class::code( ostream &s) {
 	int temps = get_temp_size();
 	method_var_table->enterscope();
 
-	emit_method_ref( global_node->get_name(), name, s);
+	emit_method_ref( global_node->get_name(), name, s); s << LABEL;
 
 	emit_func_call_before( temps, s);
 
@@ -1682,7 +1690,7 @@ void new__class::code(ostream &s) {
 
 		// Call copy.
 		emit_load( ACC, 0, S1, s);
-		s << JAL; emit_method_ref( ::Object, ::copy, s);
+		s << JAL; emit_method_ref( ::Object, ::copy, s); s << endl;
 
 		// Run init.
 		emit_load( ACC, 4, S1, s);
@@ -1694,7 +1702,7 @@ void new__class::code(ostream &s) {
 		if ( type_name != Bool)
 		{
 			emit_new( type_name, s);
-			s << JAL; emit_init_ref( type_name, s);
+			s << JAL; emit_init_ref( type_name, s); s << endl;
 		}
 		else
 		{
