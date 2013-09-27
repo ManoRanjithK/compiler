@@ -1444,10 +1444,11 @@ int loop_class::get_temp_size() {
 void typcase_class::code(ostream &s) {
 	expr->code( s);
 
-	emit_load( T0, TAG_OFFSET, ACC, s);
-
 	int last_label = new_label();
 	emit_abort( last_label, line_number, CASEABORT2, s);
+	emit_label_def( last_label, s);
+	emit_load( T0, TAG_OFFSET, ACC, s);
+	last_label = new_label();
 
 	if ( cgen_debug)
 		cout << "First label should be " << last_label << endl;
@@ -1469,8 +1470,7 @@ void typcase_class::code(ostream &s) {
 	if ( cgen_debug)
 		cout << "Coding table, first label should be " << last_label << endl;
 
-	int x, y, c, cur_label, next_label = last_label;
-	last_label = new_label();
+	int x, y, c, cur_label, next_label = new_label();
 	for ( init_vec(); next_vec(); )
 	{
 		fetch_vec( x, y, c);
