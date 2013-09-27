@@ -97,9 +97,15 @@ void push_vec( int x, int y, int c)
 	vec.push_back( std::make_pair( std::make_pair( x, y), c));
 }
 
+bool sort_cmp( const std::pair< std::pair< int, int>, int> &a,
+		const std::pair< std::pair< int, int>, int> &b)
+{
+	return a.first.first > b.first.first && a.first.second < b.first.second;
+}
+
 void sort_vec()
 {
-	sort( vec.begin(), vec.end());
+	sort( vec.begin(), vec.end(), sort_cmp);
 }
 
 void init_vec()
