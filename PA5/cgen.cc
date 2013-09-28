@@ -1367,6 +1367,8 @@ void static_dispatch_class::code(ostream &s) {
 	emit_partial_load_address( T0, s); emit_disptable_ref( type, s); s << endl;
 	emit_load( T0, offset, T0, s);
 	emit_jalr( T0, s);
+
+	expr_is_const = 1;
 }
 
 int static_dispatch_class::get_temp_size() {
@@ -1402,6 +1404,10 @@ void dispatch_class::code(ostream &s) {
 	emit_load( T0, DISPTABLE_OFFSET, ACC, s);
 	emit_load( T0, offset, T0, s);
 	emit_jalr( T0, s);
+
+	expr_is_const = 1;
+	if ( cgen_debug)
+		cout  << "Dispatch " << name << " is const ? " << bool(expr_is_const) << endl;
 }
 
 int dispatch_class::get_temp_size() {
@@ -1417,6 +1423,8 @@ void cond_class::code(ostream &s) {
 	int else_label = new_label();
 	int end_label = new_label();
 
+	if ( cgen_debug)
+		cout << "Generating if end at " << end_label << endl;
 	pred->code( s);
 	emit_load_bool( T0, falsebool, s);
 	emit_beq( ACC, T0, else_label, s);
@@ -1425,6 +1433,8 @@ void cond_class::code(ostream &s) {
 	emit_label_def( else_label, s);
 	else_exp->code( s);
 	emit_label_def( end_label, s);
+
+	expr_is_const = 1;
 }
 
 int cond_class::get_temp_size() {
@@ -1446,6 +1456,7 @@ void loop_class::code(ostream &s) {
 
 	// Return void dear.
 	emit_move( ACC, ZERO, s);
+	expr_is_const = 1;
 }
 
 int loop_class::get_temp_size() {
@@ -1511,6 +1522,7 @@ void typcase_class::code(ostream &s) {
 	emit_jal( CASEABORT, s);
 
 	emit_label_def( last_label, s);
+	expr_is_const = 1;
 }
 
 int typcase_class::get_temp_size() {
@@ -1585,8 +1597,7 @@ int let_class::get_temp_size() {
 {\
 	e1->code( s);\
 	int e1_is_const = expr_is_const;\
-	emit_push( S1, s);\
-	emit_move( S1, ACC, s);\
+	emit_push( ACC, s);\
 	e2->code( s);\
 	int e2_is_const = expr_is_const;\
 	emit_move( T0, ACC, s);\
@@ -1594,20 +1605,25 @@ int let_class::get_temp_size() {
 	{\
 		if ( !e1_is_const)\
 		{\
-			emit_move( ACC, S1, s);\
+			emit_pop( T1, s);\
+			emit_move( ACC, T1, s);\
 		}\
 		else\
 		{\
 			emit_push( T0, s);\
 			emit_new( Int, s);\
 			emit_pop( T0, s);\
+			emit_pop( T1, s);\
 		}\
 	}\
-	emit_fetch_int( S1, S1, s);\
+	else\
+	{\
+			emit_pop( T1, s);\
+	}\
+	emit_fetch_int( T1, T1, s);\
 	emit_fetch_int( T0, T0, s);\
-	emit_##cmd( T0, S1, T0, s);\
+	emit_##cmd( T0, T1, T0, s);\
 	emit_store_int( T0, ACC, s);\
-	emit_pop( S1, s);\
 	expr_is_const = 0;\
 }
 
