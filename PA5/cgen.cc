@@ -1336,6 +1336,7 @@ void assign_class::code(ostream &s) {
 	expr->code( s);
 	lookup_var( name);
 	emit_store( ACC, object_offset, object_base_reg, s);
+	expr_is_const = 1;
 }
 
 int assign_class::get_temp_size() {
