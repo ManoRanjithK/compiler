@@ -100,7 +100,7 @@ void push_vec( int x, int y, int c)
 bool sort_cmp( const std::pair< std::pair< int, int>, int> &a,
 		const std::pair< std::pair< int, int>, int> &b)
 {
-	return a.first.first > b.first.first && a.first.second < b.first.second;
+	return a.first.first >= b.first.first && a.first.second <= b.first.second;
 }
 
 void sort_vec()
