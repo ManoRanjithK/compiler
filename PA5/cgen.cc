@@ -1482,7 +1482,6 @@ void typcase_class::code(ostream &s) {
 	clear_vec();
 	for ( int i( cases->first()); cases->more( i); i = cases->next( i))
 	{
-		// TODO: should use a get_type here.
 		Symbol type = cases->nth( i)->get_type_decl();
 
 		CgenNodeP class_node = global_table->lookup( type);
