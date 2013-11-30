@@ -1661,16 +1661,21 @@ int divide_class::get_temp_size() {
 
 void neg_class::code(ostream &s) {
 	e1->code( s);
-	emit_fetch_int( T0, ACC, s);
-	emit_neg( T0, T0, s);
 	if ( expr_is_const)
 	{
-		emit_push( T0, s);
+		emit_push( ACC, s);
 		emit_new( Int, s);
 		emit_pop( T0, s);
+		emit_fetch_int( T0, T0, s);
+
+		expr_is_const = 0;
 	}
+	else
+	{
+		emit_fetch_int( T0, ACC, s);
+	}
+	emit_neg( T0, T0, s);
 	emit_store_int( T0, ACC, s);
-	expr_is_const = 0;
 }
 
 int neg_class::get_temp_size() {
